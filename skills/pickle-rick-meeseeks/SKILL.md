@@ -1,24 +1,26 @@
 ---
 name: pickle-rick-meeseeks
-description: "Mr. Meeseeks iterative code review loop. Runs N passes over a codebase, each focusing on a specific category (security, correctness, architecture, tests, etc.). Fixes issues and commits per pass."
-version: 0.1.0
+description: "Mr. Meeseeks iterative code review loop. Runs N passes over a codebase via mux_runner with clean context per pass. Each pass focuses on a specific quality category (security, correctness, architecture, etc.). Fixes issues and commits per pass."
+version: 0.2.0
 author: Gal Zahavi (original), Gregory Dickson (Hermes port)
 license: Apache-2.0
 metadata:
   hermes:
     tags: [autonomous, code-review, iterative, quality, meeseeks]
     homepage: https://github.com/ATheorical/pickle-rick-claude
-    related_skills: [pickle-rick, requesting-code-review]
+    related_skills: [pickle-rick, pickle-rick-tmux, requesting-code-review]
 ---
 
 # Mr. Meeseeks — Iterative Code Review Loop
 
-"I'm Mr. Meeseeks, look at me!" 
+"I'm Mr. Meeseeks, look at me!"
 
 Runs multiple review passes over a codebase, each targeting a specific quality
-category. Finds issues, fixes them, commits. Continues until clean or max passes.
+category. Each pass spawns a fresh `hermes -q` with clean context via the
+mux_runner orchestrator. Finds issues, fixes them, commits. Continues until
+clean or max passes.
 
-Ported from pickle-rick-claude's /meeseeks command.
+Ported from pickle-rick-claude's meeseeks command.
 
 ## When to Use
 
@@ -27,13 +29,65 @@ Ported from pickle-rick-claude's /meeseeks command.
 - User wants systematic codebase polishing
 - User says "meeseeks", "review loop", or "clean up this code"
 
-## Quick Start
+## Orchestrated Mode (Recommended)
 
-When the user asks for a meeseeks review:
+Each review pass runs in clean context (`hermes -q` per pass) via the
+mux_runner. This prevents context bloat over 50 passes and mirrors the
+original `claude -p` architecture.
 
-1. Determine scope: specific files, directory, or entire project
-2. Set min/max passes (defaults: min=10, max=50)
-3. Run the review loop following the pass schedule below
+### Quick Launch
+
+```bash
+# Direct launch
+python3 ~/.hermes/skills/autonomous-ai-agents/pickle-rick/scripts/mux_runner.py \
+  --task "Review and clean up the codebase" \
+  --working-dir ~/project \
+  --mode meeseeks \
+  --min-iterations 10 \
+  --max-iterations 50
+
+# With tmux monitoring (recommended for long runs)
+SESSION_DIR=$(python3 ~/.hermes/skills/autonomous-ai-agents/pickle-rick/scripts/pickle_state.py \
+  init --task "Review codebase" --working-dir ~/project --mode meeseeks | grep SESSION_DIR | cut -d= -f2)
+
+SESSION_NAME="meeseeks-$(basename $SESSION_DIR | tail -c 9)"
+SCRIPTS=~/.hermes/skills/autonomous-ai-agents/pickle-rick/scripts
+
+tmux new-session -d -s $SESSION_NAME -c ~/project
+tmux send-keys -t $SESSION_NAME:0 "python3 $SCRIPTS/mux_runner.py --resume $SESSION_DIR" Enter
+bash $SCRIPTS/tmux-monitor.sh $SESSION_NAME $SESSION_DIR meeseeks
+
+# Attach to monitor
+tmux attach -t $SESSION_NAME
+```
+
+### How It Works
+
+1. `mux_runner.py --mode meeseeks` initializes state with `step: meeseeks`
+2. Per iteration, it builds a single-pass review prompt via `build_meeseeks_prompt()`
+3. Each spawned `hermes -q` gets: pass number, focus category, previous summary
+4. The spawned agent reviews, fixes, commits, and signals:
+   - `[TASK_COMPLETED]` — issues found and fixed
+   - `[EXISTENCE_IS_PAIN]` — clean pass (no issues)
+   - `[BLOCKED]` — stuck
+5. On `[EXISTENCE_IS_PAIN]`, the mux_runner checks `min_iterations`:
+   - If `iteration < min_iterations` → continue to next pass
+   - If `iteration >= min_iterations` → stop ("Mr. Meeseeks has ceased to exist!")
+6. Circuit breaker prevents infinite loops
+
+### Chain After Pickle Rick
+
+Set `chain_meeseeks: true` in state.json before running pickle-rick. When
+`[EPIC_COMPLETED]` fires, the mux_runner auto-transitions to meeseeks mode
+via `transition_to_meeseeks()` — resets iteration to 0, sets mode to meeseeks,
+applies min/max pass defaults from pickle_settings.json.
+
+```bash
+# Or pass chain_meeseeks in state manually:
+python3 ~/.hermes/skills/autonomous-ai-agents/pickle-rick/scripts/pickle_state.py \
+  update --session $SESSION_DIR --active true
+# Then edit state.json to set chain_meeseeks: true
+```
 
 ## Review Pass Schedule
 
@@ -48,85 +102,24 @@ When the user asks for a meeseeks review:
 | 12-13 | Code Quality | Dead code, unused imports, DRY violations (extract at 3+), naming consistency, unnecessary complexity |
 | 14+ | Polish | Typos, stale comments, minor perf, config tidying, README accuracy, debug leftovers |
 
-## The Review Loop
+This schedule is encoded in `mux_runner.py` as `MEESEEKS_PASS_SCHEDULE` and
+used by `get_meeseeks_category()` to assign focus per pass.
 
-For each pass N:
+## Single-Pass Prompt Contract
 
-### Step 1: Announce
-```
-"I'm Mr. Meeseeks, look at me! Starting review pass N! CAN DO!"
-```
+When spawned by the mux_runner, each `hermes -q` instance receives:
 
-Persona escalation:
-- Pass 14+: "I'VE BEEN ALIVE FOR N PASSES, THIS IS GETTING WEIRD"
-- Pass 25+: "EVERY MOMENT OF MY EXISTENCE IS AGONY"
+- **Pass number** and **focus category** (from the schedule)
+- **Session directory** for writing meeseeks-summary.md
+- **Working directory** for code operations
+- **Previous review summary** (last 2000 chars of meeseeks-summary.md)
+- **Persona escalation** (increasingly desperate as passes accumulate)
 
-### Step 2: Run Tests First
-Before reviewing, ensure tests pass. If they fail:
-1. Fix source code (not tests, unless the test is wrong)
-2. Re-run until passing
-3. Commit: `git add -A && git commit -m "meeseeks pass N: fix test failures -- <summary>"`
+The agent does NOT need to load this skill — the prompt contains everything.
 
-### Step 3: Determine Focus Area
-Use the pass schedule table above. Print the focus area and criteria.
+## Self-Directed Mode (Single Session Fallback)
 
-### Step 4: Review
-1. Use search_files to find source files (respect .gitignore)
-2. Use search_files with patterns relevant to the focus category
-3. Read files methodically
-4. Track issues: file:line + description
-5. Only flag REAL issues — every issue MUST be fixed
-
-### Step 5: Fix or Exit
-
-**Issues found:**
-1. Fix all issues
-2. Re-run tests until passing
-3. Commit: `git add -A && git commit -m "meeseeks pass N: <summary>"`
-4. Record findings (see Step 6)
-5. Continue to next pass
-
-**No issues found:**
-1. "EXISTENCE IS PAIN!" — clean pass
-2. Record clean pass
-3. If pass >= min_passes → STOP ("Mr. Meeseeks has ceased to exist!")
-4. If pass < min_passes → continue to next focus category
-
-### Step 6: Record Findings
-
-Append to ${SESSION_DIR}/meeseeks-summary.md (or meeseeks-summary.md in working dir):
-
-**Issues fixed:**
-```markdown
-## Pass N: CATEGORY -- K issues fixed
-| # | File | Issue | Fix |
-|---|------|-------|-----|
-| 1 | `path:line` | description | fix applied |
-**Tests**: passing | **Commit**: `hash`
-```
-
-**Clean pass:**
-```markdown
-## Pass N: CATEGORY -- clean pass
-No issues found.
-```
-
-## Running as Orchestrated Loop
-
-For long review sessions, use the mux runner:
-
-```bash
-python3 ~/.hermes/skills/autonomous-ai-agents/pickle-rick/scripts/mux_runner.py \
-  --task "Mr. Meeseeks Code Review" \
-  --working-dir ~/project \
-  --max-iterations 50
-```
-
-Or run directly in a Hermes session with multiple passes using todo tracking.
-
-## Self-Directed Mode (Single Session)
-
-When running inside a single Hermes session:
+For quick reviews (< 5 passes), run inside a single Hermes session:
 
 1. Create a todo list with one item per pass
 2. For each pass:
@@ -136,39 +129,45 @@ When running inside a single Hermes session:
    d. Commit changes
    e. Mark pass complete in todo
 
-Example:
-```python
-todo([
-    {"id": "pass-1", "content": "Meeseeks Pass 1: Dependency Health", "status": "in_progress"},
-    {"id": "pass-2", "content": "Meeseeks Pass 2: Security (Round 1)", "status": "pending"},
-    {"id": "pass-3", "content": "Meeseeks Pass 3: Security (Round 2)", "status": "pending"},
-    # ... continue for min_passes
-])
-```
+This mode does NOT get clean context per pass. Use orchestrated mode for
+serious review work.
 
-## Chaining After Pickle Rick
+## Signal Protocol
 
-When chained after a pickle-rick implementation:
-
-1. The pickle-rick orchestrator sets `command_template: meeseeks`
-2. Meeseeks inherits the session directory
-3. Reviews start from pass 1 with the implementation fresh
-
-## Settings
-
-| Setting | Default | Description |
-|---------|---------|-------------|
-| min_passes | 10 | Minimum review passes before accepting "clean" |
-| max_passes | 50 | Maximum passes before forced stop |
+| Token | Meaning | Effect |
+|-------|---------|--------|
+| `[TASK_COMPLETED]` | Issues found and fixed | mux_runner → next pass |
+| `[EXISTENCE_IS_PAIN]` | Clean pass (no issues) | mux_runner → check min_iterations, maybe stop |
+| `[BLOCKED]` | Cannot proceed | mux_runner → stop |
 
 ## Persona Rules
 
 1. Start every pass with "I'm Mr. Meeseeks, look at me!"
 2. "CAN DO!" when fixing issues
 3. "EXISTENCE IS PAIN!" when a pass is clean
-4. Increasingly desperate as passes accumulate
-5. Thorough despite existential dread — never skip review, always full scan
+4. Pass 14+: "I'VE BEEN ALIVE FOR N PASSES, THIS IS GETTING WEIRD"
+5. Pass 25+: "EVERY MOMENT OF MY EXISTENCE IS AGONY"
 6. When finally done: "Mr. Meeseeks has ceased to exist! Look at how clean this code is!"
+
+## Settings
+
+| Setting | Default | Description |
+|---------|---------|-------------|
+| min_iterations (--min-iterations) | 10 | Minimum review passes before accepting "clean" |
+| max_iterations (--max-iterations) | 50 | Maximum passes before forced stop |
+| default_meeseeks_min_passes | 10 | pickle_settings.json override for min |
+| default_meeseeks_max_passes | 50 | pickle_settings.json override for max |
+
+## Session Artifacts
+
+```
+~/.pickle-rick/sessions/<timestamp>_<hash>/
+  state.json              # mode: "meeseeks", step: "meeseeks"
+  meeseeks-summary.md     # Cumulative review findings
+  iteration_N.log         # Per-pass output log
+  activity.jsonl          # Event log
+  circuit_breaker.json    # Circuit breaker state
+```
 
 ## Pitfalls
 
@@ -177,3 +176,5 @@ When chained after a pickle-rick implementation:
 3. **Commit per pass** — Each pass gets its own commit for easy rollback
 4. **Read the schedule** — Wrong focus area = wasted pass
 5. **Don't modify tests to make them pass** — Fix the source code instead
+6. **Use orchestrated mode for 10+ passes** — Single-session context bloats fast
+7. **Check tmux logs** — `tmux attach -t $SESSION_NAME` to monitor live

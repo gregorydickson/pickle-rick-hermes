@@ -18,11 +18,11 @@ from pickle_state import (
 
 class TestValidSteps:
     def test_all_steps_present(self):
-        expected = ['prd', 'breakdown', 'research', 'plan', 'implement', 'refactor', 'review']
+        expected = ['prd', 'breakdown', 'research', 'plan', 'implement', 'refactor', 'review', 'meeseeks']
         assert VALID_STEPS == expected
 
     def test_step_count(self):
-        assert len(VALID_STEPS) == 7
+        assert len(VALID_STEPS) == 8
 
 
 class TestDefaultState:
@@ -47,7 +47,7 @@ class TestDefaultState:
         assert DEFAULT_STATE['schema_version'] == SCHEMA_VERSION
 
     def test_total_field_count(self):
-        assert len(DEFAULT_STATE) == 20
+        assert len(DEFAULT_STATE) == 21  # includes 'mode' field
 
 
 class TestLockedReadWrite:

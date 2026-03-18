@@ -28,7 +28,7 @@ from typing import Optional, Dict, Any
 # Constants
 # ---------------------------------------------------------------------------
 
-VALID_STEPS = ['prd', 'breakdown', 'research', 'plan', 'implement', 'refactor', 'review']
+VALID_STEPS = ['prd', 'breakdown', 'research', 'plan', 'implement', 'refactor', 'review', 'meeseeks']
 SESSIONS_ROOT = Path.home() / '.pickle-rick' / 'sessions'
 SCHEMA_VERSION = 1
 
@@ -36,6 +36,7 @@ DEFAULT_STATE = {
     'active': True,
     'working_dir': '',
     'step': 'prd',
+    'mode': 'pickle',
     'iteration': 0,
     'max_iterations': 100,
     'max_time_minutes': 720,
@@ -128,9 +129,12 @@ def cmd_init(args) -> None:
 
     working_dir = os.path.abspath(args.working_dir or os.getcwd())
 
+    mode = getattr(args, 'mode', 'pickle') or 'pickle'
     state = dict(DEFAULT_STATE)
     state.update({
         'working_dir': working_dir,
+        'mode': mode,
+        'step': 'meeseeks' if mode == 'meeseeks' else 'prd',
         'start_time_epoch': int(time.time()),
         'original_prompt': args.task or '',
         'started_at': datetime.datetime.now().isoformat(),
@@ -261,6 +265,8 @@ def main():
     p_init.add_argument('--working-dir', '-w', help='Working directory (default: cwd)')
     p_init.add_argument('--max-iterations', type=int, default=100)
     p_init.add_argument('--max-time', type=int, default=720, help='Max time in minutes')
+    p_init.add_argument('--mode', choices=['pickle', 'meeseeks', 'council', 'microverse'],
+                        default='pickle', help='Session mode (default: pickle)')
 
     # read
     p_read = sub.add_parser('read', help='Read session state')

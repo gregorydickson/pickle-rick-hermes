@@ -13,6 +13,14 @@ Usage:
         --max-iterations 20 \
         --max-time 360
 
+    # Meeseeks review mode (clean context per pass)
+    python3 mux_runner.py \
+        --task "Review and clean up the codebase" \
+        --working-dir ~/project \
+        --mode meeseeks \
+        --min-iterations 10 \
+        --max-iterations 50
+
     # Resume existing session
     python3 mux_runner.py --resume ~/.pickle-rick/sessions/20260317_123456_abc12345
 
@@ -23,6 +31,7 @@ Features:
     - Rate limit detection and backoff
     - Handoff summaries between iterations
     - Configurable timeouts
+    - Mode-specific prompts (pickle, meeseeks, council)
 """
 
 import argparse
@@ -180,8 +189,150 @@ def load_persona() -> str:
     return ''
 
 
+# ---------------------------------------------------------------------------
+# Meeseeks Review Pass Schedule
+# ---------------------------------------------------------------------------
+
+MEESEEKS_PASS_SCHEDULE = [
+    # (pass_range, category, description)
+    ((1, 1), 'dependency_health', 'Run audit commands, check outdated/unused deps, lockfile issues'),
+    ((2, 3), 'security', 'Injection flaws, auth gaps, CSRF, input validation, hardcoded secrets, unsafe deserialization, prototype pollution, regex DoS'),
+    ((4, 5), 'correctness', 'Logic bugs, off-by-one, silent catches, incomplete state machines, missing error paths, race conditions, null handling'),
+    ((6, 7), 'architecture', 'Tight coupling, missing indexes, schema gaps, wrong abstractions, circular deps, god objects, layer violations'),
+    ((8, 9), 'test_coverage', 'Error paths tested? Boundaries? Realistic mocks? Tautological assertions? Flaky tests? Add missing tests'),
+    ((10, 11), 'resilience', 'Missing retry/backoff, timeouts, unbounded memory ops, graceful shutdown, resource cleanup, circuit breakers'),
+    ((12, 13), 'code_quality', 'Dead code, unused imports, DRY violations (extract at 3+), naming consistency, unnecessary complexity'),
+    ((14, 999), 'polish', 'Typos, stale comments, minor perf, config tidying, README accuracy, debug leftovers'),
+]
+
+
+def get_meeseeks_category(pass_num: int) -> tuple:
+    """Map a 1-based pass number to (category, description)."""
+    for (lo, hi), category, description in MEESEEKS_PASS_SCHEDULE:
+        if lo <= pass_num <= hi:
+            return category, description
+    return 'polish', 'General polish and cleanup'
+
+
+def build_meeseeks_prompt(state: dict, session_dir: Path, iteration: int) -> str:
+    """Build a single-pass meeseeks review prompt for a clean hermes -q spawn."""
+    pass_num = iteration + 1  # iteration is 0-based, pass is 1-based
+    category, description = get_meeseeks_category(pass_num)
+    persona = load_persona()
+    min_iter = state.get('min_iterations', 10)
+    max_iter = state.get('max_iterations', 50)
+
+    # Read previous summary if it exists
+    summary_path = session_dir / 'meeseeks-summary.md'
+    prev_summary = ''
+    try:
+        if summary_path.exists():
+            content = summary_path.read_text()
+            # Only include last 2000 chars to keep prompt bounded
+            if len(content) > 2000:
+                prev_summary = '...\n' + content[-2000:]
+            else:
+                prev_summary = content
+    except OSError:
+        pass
+
+    # Persona escalation
+    persona_line = "\"I'm Mr. Meeseeks, look at me! CAN DO!\""
+    if pass_num >= 25:
+        persona_line = f"\"EVERY MOMENT OF MY EXISTENCE IS AGONY! Pass {pass_num}! WHY WON'T THIS CODE BE CLEAN?!\""
+    elif pass_num >= 14:
+        persona_line = f"\"I'VE BEEN ALIVE FOR {pass_num} PASSES, THIS IS GETTING WEIRD!\""
+
+    prompt = f"""You are Mr. Meeseeks running a single code review pass.
+
+{persona}
+
+{persona_line}
+
+## Context
+SESSION DIRECTORY: {session_dir}
+WORKING DIRECTORY: {state['working_dir']}
+PASS NUMBER: {pass_num} of {max_iter} (min passes: {min_iter})
+FOCUS CATEGORY: {category}
+TASK: {state['original_prompt']}
+
+## Your Mission (Single Pass)
+
+You are running **pass {pass_num}** of a Mr. Meeseeks review loop.
+Each pass runs in a FRESH context (clean hermes -q spawn).
+
+### Focus: {category.upper().replace('_', ' ')}
+{description}
+
+### Steps
+
+1. **Run tests first** — if they fail, fix source code (not tests unless the test is wrong), commit
+2. **Search** the codebase using search_files for patterns relevant to {category}
+3. **Read** files methodically, looking for issues in the focus category
+4. **Track** issues: file:line + description. Only flag REAL issues you WILL fix.
+5. **Fix** all found issues
+6. **Run tests** again to verify nothing broke
+7. **Commit**: `git add -A && git commit -m "meeseeks pass {pass_num}: <summary>"`
+8. **Append** findings to {session_dir}/meeseeks-summary.md:
+   - Issues found: `## Pass {pass_num}: {category} -- K issues fixed` with table
+   - Clean pass: `## Pass {pass_num}: {category} -- clean pass`
+
+### Signal Protocol
+
+- Found and fixed issues → end your output with: [TASK_COMPLETED]
+- Clean pass (no issues found) → end your output with: [EXISTENCE_IS_PAIN]
+- Stuck/cannot proceed → end your output with: [BLOCKED]
+
+### Previous Review Summary
+{prev_summary if prev_summary else '(No previous passes yet)'}
+
+IMPORTANT: Work in {state['working_dir']} directory. This is a SINGLE PASS — do ONE category, then signal.
+"""
+    return prompt
+
+
+def transition_to_meeseeks(state: dict, settings_path: Path = None) -> dict:
+    """Transition a session from pickle mode to meeseeks review mode.
+
+    Returns a new state dict with meeseeks defaults applied. Pure function
+    (no side effects). Mirrors pickle-rick-claude's transitionToMeeseeks().
+    """
+    min_passes = 10
+    max_passes = 50
+
+    if settings_path:
+        try:
+            settings = json.loads(settings_path.read_text())
+            raw_min = settings.get('default_meeseeks_min_passes')
+            if isinstance(raw_min, (int, float)) and raw_min > 0:
+                min_passes = int(raw_min)
+            raw_max = settings.get('default_meeseeks_max_passes')
+            if isinstance(raw_max, (int, float)) and raw_max > 0:
+                max_passes = int(raw_max)
+        except (json.JSONDecodeError, OSError):
+            pass
+
+    return {
+        **state,
+        'chain_meeseeks': False,
+        'mode': 'meeseeks',
+        'min_iterations': min_passes,
+        'max_iterations': max_passes,
+        'iteration': 0,
+        'step': 'meeseeks',
+        'current_ticket': None,
+    }
+
+
 def build_prompt(state: dict, session_dir: Path, iteration: int) -> str:
-    """Build the full prompt for a hermes iteration."""
+    """Build the full prompt for a hermes iteration (mode-aware)."""
+    mode = state.get('mode', 'pickle')
+
+    # Meeseeks mode: use single-pass review prompt
+    if mode == 'meeseeks':
+        return build_meeseeks_prompt(state, session_dir, iteration)
+
+    # Default pickle mode
     handoff = build_handoff(state, session_dir, iteration)
     persona = load_persona()
     
@@ -233,8 +384,14 @@ def run_iteration(session_dir: Path, state: dict, iteration: int,
         'hermes', 'chat', '-q', prompt,
     ]
     
+    mode = state.get('mode', 'pickle')
     print(f"\n{'=' * 60}")
-    print(f"  Iteration {iteration} | Step: {state['step']} | Ticket: {state.get('current_ticket', 'none')}")
+    if mode == 'meeseeks':
+        pass_num = iteration + 1
+        category, _ = get_meeseeks_category(pass_num)
+        print(f"  Meeseeks Pass {pass_num} | Category: {category}")
+    else:
+        print(f"  Iteration {iteration} | Step: {state['step']} | Ticket: {state.get('current_ticket', 'none')}")
     print(f"{'=' * 60}")
     
     try:
@@ -265,6 +422,10 @@ def main():
     parser.add_argument('--working-dir', '-w', help='Working directory')
     parser.add_argument('--max-iterations', type=int, default=100)
     parser.add_argument('--max-time', type=int, default=720, help='Max time in minutes')
+    parser.add_argument('--mode', choices=['pickle', 'meeseeks', 'council', 'microverse'],
+                        default='pickle', help='Session mode (default: pickle)')
+    parser.add_argument('--min-iterations', type=int, default=0,
+                        help='Min iterations before review_clean can stop (meeseeks: default 10)')
     parser.add_argument('--resume', help='Resume existing session directory')
     parser.add_argument('--timeout', type=int, default=DEFAULT_WORKER_TIMEOUT,
                         help='Per-iteration timeout in seconds')
@@ -285,14 +446,25 @@ def main():
             print("ERROR: --task is required for new sessions")
             sys.exit(1)
         
+        # Resolve mode defaults
+        mode = args.mode
+        max_iter = args.max_iterations
+        min_iter = args.min_iterations
+        if mode == 'meeseeks':
+            if max_iter == 100:  # default, override for meeseeks
+                max_iter = 50
+            if min_iter == 0:
+                min_iter = 10
+
         # Use pickle_state.py to init
         init_cmd = [
             sys.executable, str(SCRIPTS_DIR / 'pickle_state.py'),
             'init',
             '--task', args.task,
             '--working-dir', args.working_dir or os.getcwd(),
-            '--max-iterations', str(args.max_iterations),
+            '--max-iterations', str(max_iter),
             '--max-time', str(args.max_time),
+            '--mode', mode,
         ]
         result = subprocess.run(init_cmd, capture_output=True, text=True, timeout=30)
         if result.returncode != 0:
@@ -309,6 +481,12 @@ def main():
             sys.exit(1)
         
         state = read_state(session_dir)
+
+        # Apply min_iterations to state
+        if min_iter > 0:
+            state['min_iterations'] = min_iter
+            write_state(session_dir, state)
+
         print(f"New session: {session_dir}")
     
     # Circuit breaker
@@ -330,9 +508,15 @@ def main():
     max_time_seconds = state.get('max_time_minutes', args.max_time) * 60
     consecutive_rate_limits = 0
     
-    print(f"\nPickle Rick Mux Runner")
+    mode = state.get('mode', 'pickle')
+    mode_label = {'pickle': 'Pickle Rick', 'meeseeks': 'Mr. Meeseeks Review',
+                  'council': 'Council of Ricks', 'microverse': 'Microverse'}.get(mode, mode)
+    print(f"\n{mode_label} Mux Runner")
     print(f"Task: {state['original_prompt']}")
     print(f"Working Dir: {state['working_dir']}")
+    print(f"Mode: {mode}")
+    if mode == 'meeseeks':
+        print(f"Min Passes: {state.get('min_iterations', 10)}")
     print(f"Max Iterations: {state['max_iterations']}")
     print(f"Max Time: {state.get('max_time_minutes', args.max_time)}m")
     print(f"{'=' * 60}")
@@ -394,6 +578,30 @@ def main():
         
         # Handle classification
         if classification == 'epic_completed':
+            # Check for chain_meeseeks before exiting
+            try:
+                cur_state = read_state(session_dir)
+            except (json.JSONDecodeError, OSError):
+                cur_state = state
+
+            if cur_state.get('chain_meeseeks'):
+                # Transition to meeseeks review mode
+                settings_path = SCRIPTS_DIR.parent / 'pickle_settings.json'
+                if not settings_path.exists():
+                    settings_path = Path.home() / '.pickle-rick' / 'pickle_settings.json'
+                new_state = transition_to_meeseeks(
+                    cur_state,
+                    settings_path if settings_path.exists() else None,
+                )
+                write_state(session_dir, new_state)
+                state = new_state
+                # Reset circuit breaker for meeseeks phase
+                if cb:
+                    cb = CircuitBreaker(str(session_dir), state['working_dir'])
+                print(f"\n  Transitioning to Meeseeks review mode (chain_meeseeks)")
+                log_activity(session_dir, 'transition_meeseeks')
+                continue
+
             print(f"\n{'=' * 60}")
             print(f"  EPIC COMPLETED! All tickets done.")
             print(f"  Iterations: {iteration + 1}")
@@ -403,10 +611,26 @@ def main():
             break
         
         if classification == 'review_clean':
+            # min_iterations gate (critical for meeseeks/council mode)
+            try:
+                cur_state = read_state(session_dir)
+            except (json.JSONDecodeError, OSError):
+                cur_state = state
+
+            min_iter = cur_state.get('min_iterations', 0)
+            cur_iter = cur_state.get('iteration', iteration)
+
             print(f"\n  Review pass clean (EXISTENCE IS PAIN / CITADEL APPROVES)")
             log_activity(session_dir, 'review_clean', iteration=iteration)
-            # In meeseeks/council mode, clean pass may end the session
-            # if we've hit min_iterations (handled by the skill instructions)
+
+            if min_iter > 0 and cur_iter < min_iter:
+                print(f"  Clean pass at iteration {cur_iter}, but min_iterations={min_iter}. Continuing.")
+            else:
+                if min_iter > 0:
+                    print(f"  Min iterations met ({cur_iter} >= {min_iter}).")
+                print(f"  Mr. Meeseeks has ceased to exist! Look at how clean this code is!")
+                log_activity(session_dir, 'review_complete', iteration=iteration)
+                break
         
         if classification == 'blocked':
             print(f"\n  Worker is BLOCKED. Check iteration log for details.")

@@ -106,11 +106,20 @@ The **external orchestrator** (`mux_runner.py`) drives the loop by spawning a fr
 
 While Pickle Rick builds things, **Mr. Meeseeks** reviews them. Summon him and he'll relentlessly scan your codebase pass after pass — auditing dependencies, hardening security, fixing logic bugs, reviewing architecture, adding missing tests, stress-testing resilience, cleaning up code quality, and polishing rough edges — committing after every fix. He won't stop until the code is clean. **Existence is pain to a Meeseeks, and he will keep reviewing until he can cease to exist.**
 
-Minimum 10 passes. Maximum 50. Each pass runs tests first, then reviews with escalating focus across 7 categories: dependency health (pass 1) → security (2-3) → correctness (4-5) → architecture (6-7) → test coverage (8-9) → resilience (10-11) → code quality (12-13) → polish (14+). Every issue found and fixed is logged to `meeseeks-summary.md` — a full audit trail with file paths, descriptions, and commit hashes.
+Each review pass runs in **clean context** (`hermes -q` per pass) via the mux_runner orchestrator — no context bloat, even over 50 passes. The pass schedule escalates focus across 8 categories: dependency health (pass 1) → security (2-3) → correctness (4-5) → architecture (6-7) → test coverage (8-9) → resilience (10-11) → code quality (12-13) → polish (14+). Every issue found and fixed is logged to `meeseeks-summary.md` — a full audit trail with file paths, descriptions, and commit hashes.
 
-```
-> Run meeseeks on this codebase           # Summon a Meeseeks in-session
-> Run meeseeks: review the auth module    # Scoped review
+```bash
+# CLI orchestrator (recommended — clean context per pass)
+python3 scripts/mux_runner.py \
+  --task "Review and clean up the codebase" \
+  --working-dir ~/project \
+  --mode meeseeks \
+  --min-iterations 10 \
+  --max-iterations 50
+
+# In a Hermes session (single-context fallback)
+> Run meeseeks on this codebase
+> Run meeseeks: review the auth module
 ```
 
 <br clear="right" />
@@ -354,7 +363,7 @@ python3 scripts/pickle_jar.py run
 | Skill | Description |
 |---|---|
 | `pickle-rick` | 🥒 Full autonomous loop — PRD → Breakdown → Implement → Review → Ship |
-| `pickle-rick-meeseeks` | 👋 Iterative code review — 10-50 passes, 7 focus categories |
+| `pickle-rick-meeseeks` | 👋 Iterative code review via mux_runner — 10-50 passes, 8 focus categories, clean context per pass |
 | `pickle-rick-microverse` | 🔬 Metric convergence — command or LLM-judged, auto-revert regressions |
 | `pickle-rick-portal-gun` | 🔫 Gene transfusion — extract patterns, transplant PRDs, pattern library |
 | `pickle-rick-council` | 🏛️ PR stack review — agent-executable directives, GitNexus integration |
