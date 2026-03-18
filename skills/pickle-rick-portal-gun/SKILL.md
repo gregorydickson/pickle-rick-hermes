@@ -1,13 +1,13 @@
 ---
 name: pickle-rick-portal-gun
 description: "Pattern transplantation: open a portal to another codebase, extract its patterns, and generate a PRD to transplant them into your project. Supports GitHub repos, local paths, npm/PyPI packages."
-version: 0.1.0
+version: 0.2.0
 author: Gal Zahavi (original), Gregory Dickson (Hermes port)
 license: Apache-2.0
 metadata:
   hermes:
     tags: [autonomous, transplant, patterns, portal-gun, code-analysis]
-    homepage: https://github.com/ATheorical/pickle-rick-claude
+    homepage: https://github.com/gregorydickson/pickle-rick-hermes
     related_skills: [pickle-rick, pickle-rick-meeseeks]
 ---
 

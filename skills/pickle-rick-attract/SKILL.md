@@ -1,13 +1,13 @@
 ---
 name: pickle-rick-attract
 description: "Submit a DOT pipeline to the attractor server for execution. Validates locally, submits via HTTP, monitors with exponential backoff, handles human gates."
-version: 0.1.0
+version: 0.2.0
 author: Gal Zahavi (original), Gregory Dickson (Hermes port)
 license: Apache-2.0
 metadata:
   hermes:
     tags: [autonomous, pipeline, attractor, execution, DOT]
-    homepage: https://github.com/gregorydickson/pickle-rick-claude
+    homepage: https://github.com/gregorydickson/pickle-rick-hermes
     related_skills: [pickle-rick-dot, pickle-rick]
 ---
 
@@ -128,3 +128,11 @@ On terminal state:
 - **NEVER** log, print, or echo API keys
 - Store keys in `.env` (ensure `.gitignore` includes it)
 - Mask keys in error responses before displaying
+
+
+
+## Pitfalls
+
+1. **Server must be running** — The attractor endpoint must be reachable before submission
+2. **Valid DOT required** — Use pickle-rick-dot to generate valid DOT before submitting
+3. **Check response** — The server may reject malformed or cyclic graphs

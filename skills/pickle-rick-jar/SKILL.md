@@ -1,13 +1,13 @@
 ---
 name: pickle-rick-jar
 description: "Pickle Jar batch job queue: queue multiple PRDs/tasks for sequential autonomous execution. Add tasks to the jar, then open it to process them one by one."
-version: 0.1.0
+version: 0.2.0
 author: Gal Zahavi (original), Gregory Dickson (Hermes port)
 license: Apache-2.0
 metadata:
   hermes:
     tags: [autonomous, batch, queue, pickle-jar, orchestration]
-    homepage: https://github.com/ATheorical/pickle-rick-claude
+    homepage: https://github.com/gregorydickson/pickle-rick-hermes
     related_skills: [pickle-rick, pickle-rick-meeseeks]
 ---
 

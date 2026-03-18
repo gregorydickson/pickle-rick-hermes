@@ -1,13 +1,13 @@
 ---
 name: pickle-rick
 description: "Autonomous engineering loop: PRD → Breakdown → Implement → Review → Ship. Ported from pickle-rick-claude. Uses delegate_task for workers, external Python orchestrator for iteration loop, circuit breaker for safety."
-version: 0.1.0
+version: 0.2.0
 author: Gal Zahavi (original), Gregory Dickson (Hermes port)
 license: Apache-2.0
 metadata:
   hermes:
     tags: [autonomous, engineering, loop, orchestration, PRD, delegation]
-    homepage: https://github.com/ATheorical/pickle-rick-claude
+    homepage: https://github.com/gregorydickson/pickle-rick-hermes
     related_skills: [pickle-rick-meeseeks, hermes-agent, subagent-driven-development]
 ---
 

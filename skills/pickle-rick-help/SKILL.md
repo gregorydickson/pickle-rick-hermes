@@ -100,3 +100,10 @@ All sessions stored in `~/.pickle-rick/sessions/`.
 Jar data in `~/.pickle-rick/jar/`.
 Patterns in `~/.pickle-rick/patterns/`.
 Settings in `~/.pickle-rick/pickle_settings.json`.
+
+
+
+## Pitfalls
+
+1. **This is read-only** — Help lists commands but doesn't execute them
+2. **Check skill versions** — If a command doesn't work, the skill may need updating

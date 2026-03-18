@@ -1,13 +1,13 @@
 ---
 name: pickle-rick-chaos
 description: "Project Mayhem chaos engineering: mutation testing, dependency downgrades, config corruption. Non-destructive, language-agnostic, produces a Chaos Score report."
-version: 0.1.0
+version: 0.2.0
 author: Gal Zahavi (original), Gregory Dickson (Hermes port)
 license: Apache-2.0
 metadata:
   hermes:
     tags: [chaos-engineering, mutation-testing, security, resilience, testing]
-    homepage: https://github.com/gregorydickson/pickle-rick-claude
+    homepage: https://github.com/gregorydickson/pickle-rick-hermes
     related_skills: [pickle-rick, pickle-rick-meeseeks]
 ---
 
@@ -224,3 +224,13 @@ If any fail: `git checkout .`, restore deps, warn user.
 3. **ALWAYS** revert after each chaos cycle
 4. **ALWAYS** verify revert succeeded before next cycle
 5. **CONFIRM** ecosystem and configs with user before starting
+
+
+
+## Pitfalls
+
+1. **Run on a branch** — Never run mutation testing on main/master
+2. **Commit clean first** — Ensure no uncommitted changes before starting chaos
+3. **Review mutations** — Not all surviving mutants indicate real bugs
+4. **Config chaos is destructive** — Always have a git checkpoint to revert to
+5. **Dependency chaos may break lockfiles** — Re-install after reverting

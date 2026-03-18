@@ -1,13 +1,13 @@
 ---
 name: pickle-rick-tmux
 description: "Launch Pickle Rick sessions in tmux or Zellij with a 4-pane live monitor dashboard. Supports pickle, meeseeks, microverse, and council modes."
-version: 0.1.0
+version: 0.2.0
 author: Gal Zahavi (original), Gregory Dickson (Hermes port)
 license: Apache-2.0
 metadata:
   hermes:
     tags: [tmux, zellij, monitor, dashboard, terminal-multiplexer]
-    homepage: https://github.com/ATheorical/pickle-rick-claude
+    homepage: https://github.com/gregorydickson/pickle-rick-hermes
     related_skills: [pickle-rick, pickle-rick-meeseeks, pickle-rick-microverse]
 ---
 

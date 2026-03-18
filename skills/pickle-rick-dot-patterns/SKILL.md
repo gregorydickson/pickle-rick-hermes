@@ -1,13 +1,13 @@
 ---
 name: pickle-rick-dot-patterns
 description: "DOT pipeline pattern reference for pickle-rick-dot. 12 convergence patterns for attractor-compatible graphs. Load on demand — not for direct use."
-version: 0.1.0
+version: 0.2.0
 author: Gal Zahavi (original), Gregory Dickson (Hermes port)
 license: Apache-2.0
 metadata:
   hermes:
     tags: [patterns, DOT, reference, attractor, convergence]
-    homepage: https://github.com/gregorydickson/pickle-rick-claude
+    homepage: https://github.com/gregorydickson/pickle-rick-hermes
     related_skills: [pickle-rick-dot, pickle-rick-attract]
 ---
 
@@ -132,3 +132,11 @@ rollback -> optimize
 - Graph-level `retry_target` MUST point to `fix_all`
 - Per-node `retry_target` on every `goal_gate=true` node
 - Fan-out branches stay within scope
+
+
+
+## Pitfalls
+
+1. **This is a reference, not a command** — Load this skill when building DOT graphs, don't run it
+2. **Match patterns to task type** — Not every PRD needs every convergence pattern
+3. **Node naming conventions** — Use snake_case for node IDs per the examples

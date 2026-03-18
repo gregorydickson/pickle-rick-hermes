@@ -7,7 +7,7 @@ license: Apache-2.0
 metadata:
   hermes:
     tags: [autonomous, code-review, iterative, quality, meeseeks]
-    homepage: https://github.com/ATheorical/pickle-rick-claude
+    homepage: https://github.com/gregorydickson/pickle-rick-hermes
     related_skills: [pickle-rick, pickle-rick-tmux, requesting-code-review]
 ---
 

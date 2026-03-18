@@ -1,13 +1,13 @@
 ---
 name: pickle-rick-dot
 description: "Convert a PRD into an attractor-compatible DOT digraph with convergence patterns: test-fix loops, goal gates, review ratchets, fan-out/in, security scanning, and microverse optimization."
-version: 0.1.0
+version: 0.2.0
 author: Gal Zahavi (original), Gregory Dickson (Hermes port)
 license: Apache-2.0
 metadata:
   hermes:
     tags: [autonomous, pipeline, DOT, graphviz, attractor, convergence]
-    homepage: https://github.com/gregorydickson/pickle-rick-claude
+    homepage: https://github.com/gregorydickson/pickle-rick-hermes
     related_skills: [pickle-rick, pickle-rick-attract]
 ---
 
@@ -155,3 +155,12 @@ Fix any errors. Show warnings.
 Print DOT file path. Suggest: "Run pickle-rick-attract to submit to the attractor server."
 
 Load the full pattern reference from pickle-rick-dot-patterns skill for detailed pattern specs.
+
+
+
+## Pitfalls
+
+1. **PRD must exist first** — Use pickle-rick-prd to draft requirements before converting
+2. **Validate DOT syntax** — Run through `dot -Tsvg` to catch syntax errors
+3. **Convergence patterns** — Use pickle-rick-dot-patterns as reference for node shapes
+4. **Cycle detection** — DOT graphs with cycles may confuse the attractor

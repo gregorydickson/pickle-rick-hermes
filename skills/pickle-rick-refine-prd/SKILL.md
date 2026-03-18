@@ -1,13 +1,13 @@
 ---
 name: pickle-rick-refine-prd
 description: "Refine PRDs using 3 parallel analyst subagents (requirements, codebase, risk/scope), then decompose into atomic tickets with verification criteria."
-version: 0.1.0
+version: 0.2.0
 author: Gal Zahavi (original), Gregory Dickson (Hermes port)
 license: Apache-2.0
 metadata:
   hermes:
     tags: [autonomous, PRD, refinement, analysis, tickets, decomposition]
-    homepage: https://github.com/gregorydickson/pickle-rick-claude
+    homepage: https://github.com/gregorydickson/pickle-rick-hermes
     related_skills: [pickle-rick, pickle-rick-prd, pickle-rick-morty]
 ---
 
@@ -183,3 +183,12 @@ Write `{SESSION_DIR}/refinement_summary.md`: timestamp, per-analysis changes, ta
 Report: PRD path, ticket count, risk level, resume commands.
 
 "Run pickle-rick with --resume SESSION_DIR to execute, or review the refined PRD first."
+
+
+
+## Pitfalls
+
+1. **Don't run all 3 analysts sequentially** — Use delegate_task for parallel execution
+2. **Merge conflicts** — Three analysts may propose contradictory changes; the aggregator must resolve
+3. **Ticket ordering matters** — Dependencies must be reflected in ticket order numbers
+4. **Don't over-decompose** — Each ticket should represent a meaningful, testable change

@@ -1,13 +1,13 @@
 ---
 name: pickle-rick-morty
 description: "Morty Worker instructions for pickle-rick subagents. Defines the Research -> Plan -> Implement -> Verify -> Review -> Simplify lifecycle that workers follow when implementing tickets."
-version: 0.1.0
+version: 0.2.0
 author: Gal Zahavi (original), Gregory Dickson (Hermes port)
 license: Apache-2.0
 metadata:
   hermes:
     tags: [autonomous, worker, implementation, TDD, morty]
-    homepage: https://github.com/ATheorical/pickle-rick-claude
+    homepage: https://github.com/gregorydickson/pickle-rick-hermes
     related_skills: [pickle-rick, test-driven-development]
 ---
 
@@ -168,3 +168,13 @@ Before signaling completion, verify ALL exist:
 5. **Verify after every phase** — run the check commands
 6. **Self-review is real review** — actually read your diff
 7. **Simplify is mandatory** — clean up after yourself
+
+
+
+## Pitfalls
+
+1. **Follow the lifecycle order** — Research → Plan → Implement → Verify. Don't skip steps.
+2. **Write artifacts** — research.md, plan.md, conformance.md must exist or the manager rejects the ticket
+3. **Commit your work** — `git add -A && git commit` before signaling completion
+4. **Don't exceed scope** — Implement only what the ticket specifies, nothing more
+5. **Signal clearly** — Use [TASK_COMPLETED] or [BLOCKED] so the orchestrator can act

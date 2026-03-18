@@ -7,7 +7,7 @@ license: Apache-2.0
 metadata:
   hermes:
     tags: [autonomous, code-review, PR, stack, graphite, council]
-    homepage: https://github.com/ATheorical/pickle-rick-claude
+    homepage: https://github.com/gregorydickson/pickle-rick-hermes
     related_skills: [pickle-rick, pickle-rick-meeseeks, pickle-rick-tmux]
 ---
 

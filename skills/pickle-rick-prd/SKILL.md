@@ -1,13 +1,13 @@
 ---
 name: pickle-rick-prd
 description: "Interactive PRD drafter: interview the user about requirements, verification strategy, and interface contracts, then produce a machine-verifiable PRD."
-version: 0.1.0
+version: 0.2.0
 author: Gal Zahavi (original), Gregory Dickson (Hermes port)
 license: Apache-2.0
 metadata:
   hermes:
     tags: [autonomous, PRD, requirements, interview, verification]
-    homepage: https://github.com/gregorydickson/pickle-rick-claude
+    homepage: https://github.com/gregorydickson/pickle-rick-hermes
     related_skills: [pickle-rick, pickle-rick-refine-prd]
 ---
 
@@ -130,3 +130,12 @@ Exact shapes at module/service boundaries.
 3. **Contracts are mandatory** — exact shapes, not prose
 4. **Test expectations before implementation** — spec drives tests
 5. **Use clarify tool** — ask the user questions interactively
+
+
+
+## Pitfalls
+
+1. **Don't skip verification strategy** — A PRD without acceptance criteria is useless
+2. **Ask if vague** — When the user's prompt is ambiguous, interview don't guess
+3. **Keep scope realistic** — One PRD = one feature or refactor, not an entire product
+4. **Interface contracts first** — Define API shapes before implementation details

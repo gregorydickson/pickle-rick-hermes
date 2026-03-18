@@ -1,13 +1,13 @@
 ---
 name: pickle-rick-morty-review
 description: "Review Worker (Meeseeks-lite): cross-ticket spec conformance, focused security/correctness review, and simplification. Used after implementation to verify ticket groups."
-version: 0.1.0
+version: 0.2.0
 author: Gal Zahavi (original), Gregory Dickson (Hermes port)
 license: Apache-2.0
 metadata:
   hermes:
     tags: [autonomous, review, worker, conformance, security]
-    homepage: https://github.com/gregorydickson/pickle-rick-claude
+    homepage: https://github.com/gregorydickson/pickle-rick-hermes
     related_skills: [pickle-rick, pickle-rick-morty, pickle-rick-meeseeks]
 ---
 
@@ -168,3 +168,12 @@ delegate_task(
     toolsets=['terminal', 'file']
 )
 ```
+
+
+
+## Pitfalls
+
+1. **Don't fix code** — Write a conformance report, not patches
+2. **Check all tickets** — Every ticket artifact must be reviewed, not just the latest
+3. **Flag missing artifacts** — If research.md or plan.md doesn't exist, that's a finding
+4. **Be specific** — File paths and line numbers in every finding
