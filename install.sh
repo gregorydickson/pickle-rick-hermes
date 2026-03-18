@@ -17,7 +17,7 @@ mkdir -p "${HOME}/.pickle-rick/sessions"
 mkdir -p "${HOME}/.pickle-rick/jar"
 
 # Skills to install (each gets its own directory)
-SKILLS=(pickle-rick pickle-rick-meeseeks pickle-rick-microverse pickle-rick-portal-gun pickle-rick-council pickle-rick-jar pickle-rick-morty pickle-rick-help pickle-rick-tmux)
+SKILLS=(pickle-rick pickle-rick-meeseeks pickle-rick-microverse pickle-rick-portal-gun pickle-rick-council pickle-rick-jar pickle-rick-morty pickle-rick-morty-review pickle-rick-help pickle-rick-tmux pickle-rick-prd pickle-rick-refine-prd pickle-rick-chaos pickle-rick-dot pickle-rick-dot-patterns pickle-rick-attract)
 
 for skill in "${SKILLS[@]}"; do
     src="${SCRIPT_DIR}/skills/${skill}"
