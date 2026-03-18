@@ -35,18 +35,41 @@ class CircuitBreaker:
     CLOSED:    Normal operation. Tracks consecutive no-progress iterations.
     HALF_OPEN: One test iteration allowed after cool-down.
     OPEN:      Session stopped. No iterations allowed.
+    
+    Thresholds are read from ~/.pickle-rick/pickle_settings.json at init,
+    falling back to hardcoded defaults if the file is missing or corrupt.
     """
     
-    # Thresholds
-    NO_PROGRESS_THRESHOLD = 3
-    SAME_ERROR_THRESHOLD = 3
-    HALF_OPEN_AFTER_ITERATIONS = 2
+    # Default thresholds (overridden by settings file)
+    DEFAULT_NO_PROGRESS_THRESHOLD = 5
+    DEFAULT_SAME_ERROR_THRESHOLD = 5
+    DEFAULT_HALF_OPEN_AFTER = 2
     
     def __init__(self, session_dir: str, working_dir: str):
         self.session_dir = Path(session_dir)
         self.working_dir = Path(working_dir)
         self.state_file = self.session_dir / 'circuit_breaker.json'
+        
+        # Load thresholds from settings
+        settings = self._load_settings()
+        self.NO_PROGRESS_THRESHOLD = settings.get(
+            'default_cb_no_progress_threshold', self.DEFAULT_NO_PROGRESS_THRESHOLD)
+        self.SAME_ERROR_THRESHOLD = settings.get(
+            'default_cb_same_error_threshold', self.DEFAULT_SAME_ERROR_THRESHOLD)
+        self.HALF_OPEN_AFTER_ITERATIONS = settings.get(
+            'default_cb_half_open_after', self.DEFAULT_HALF_OPEN_AFTER)
+        self.enabled = settings.get('default_circuit_breaker_enabled', True)
+        
         self.state = self._load_or_init()
+    
+    @staticmethod
+    def _load_settings() -> dict:
+        """Load settings from pickle_settings.json."""
+        settings_path = Path.home() / '.pickle-rick' / 'pickle_settings.json'
+        try:
+            return json.loads(settings_path.read_text())
+        except (json.JSONDecodeError, OSError):
+            return {}
     
     def _load_or_init(self) -> Dict[str, Any]:
         if self.state_file.exists():
@@ -146,6 +169,8 @@ class CircuitBreaker:
             self.state['opened_at'] = datetime.datetime.now().isoformat()
     
     def can_execute(self) -> bool:
+        if not self.enabled:
+            return True
         if self.state['state'] == 'OPEN':
             return False
         return True

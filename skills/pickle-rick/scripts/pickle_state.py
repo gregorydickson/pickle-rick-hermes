@@ -47,6 +47,11 @@ DEFAULT_STATE = {
     'history': [],
     'started_at': '',
     'session_dir': '',
+    'tmux_mode': False,
+    'min_iterations': 0,
+    'command_template': None,
+    'chain_meeseeks': False,
+    'pid': None,
     'schema_version': SCHEMA_VERSION,
 }
 
