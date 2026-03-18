@@ -205,7 +205,7 @@ Signal completion with [TASK_COMPLETED] when done.
 Signal [BLOCKED] if you cannot make progress.
 """
     
-    cmd = ['hermes', 'chat', '-q', prompt]
+    cmd = ['hermes', 'chat', '-q', prompt, '-Q']
     
     try:
         result = subprocess.run(

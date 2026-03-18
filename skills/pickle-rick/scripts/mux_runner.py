@@ -471,7 +471,7 @@ def run_iteration(session_dir: Path, state: dict, iteration: int,
     log_file = session_dir / f'iteration_{iteration}.log'
     
     cmd = [
-        'hermes', 'chat', '-q', prompt,
+        'hermes', 'chat', '-q', prompt, '-Q',
     ]
     
     mode = state.get('mode', 'pickle')
