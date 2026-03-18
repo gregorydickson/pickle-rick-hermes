@@ -232,10 +232,12 @@ def main():
         print(f'Session directory not found: {session_dir}')
         sys.exit(1)
     
-    signal.signal(signal.SIGINT, lambda s, f: (
-        sys.stdout.write(f'\033[2J\033[H{MX.DIM}Monitor detached.{MX.R}\n'),
+    def handle_sigint(signum, frame):
+        sys.stdout.write(f'\033[2J\033[H{MX.DIM}Monitor detached.{MX.R}\n')
+        sys.stdout.flush()
         sys.exit(0)
-    ))
+    
+    signal.signal(signal.SIGINT, handle_sigint)
     
     while True:
         active = render(session_dir)

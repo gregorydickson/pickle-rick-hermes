@@ -99,14 +99,24 @@ def compare_metric(current: float, previous: float, tolerance: float,
 
 def read_microverse_state(session_dir: Path) -> dict:
     path = session_dir / 'microverse.json'
-    return json.loads(path.read_text())
+    try:
+        return json.loads(path.read_text())
+    except (json.JSONDecodeError, OSError) as e:
+        raise RuntimeError(f"Failed to read microverse.json: {e}") from e
 
 
 def write_microverse_state(session_dir: Path, state: dict) -> None:
     path = session_dir / 'microverse.json'
     tmp = path.with_suffix('.tmp')
-    tmp.write_text(json.dumps(state, indent=2))
-    os.rename(str(tmp), str(path))
+    try:
+        tmp.write_text(json.dumps(state, indent=2))
+        os.rename(str(tmp), str(path))
+    except OSError:
+        try:
+            tmp.unlink(missing_ok=True)
+        except OSError:
+            pass
+        path.write_text(json.dumps(state, indent=2))
 
 
 def build_handoff(mv_state: dict, session_dir: Path, iteration: int) -> str:

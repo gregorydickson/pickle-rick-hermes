@@ -52,6 +52,8 @@ SIGNAL_TOKENS = {
     'PRD_COMPLETE': '[PRD_COMPLETE]',
     'TICKET_SELECTED': '[TICKET_SELECTED]',
     'BLOCKED': '[BLOCKED]',
+    'EXISTENCE_IS_PAIN': '[EXISTENCE_IS_PAIN]',
+    'THE_CITADEL_APPROVES': '[THE_CITADEL_APPROVES]',
 }
 
 DEFAULT_WORKER_TIMEOUT = 1200  # 20 minutes per iteration
@@ -64,14 +66,25 @@ RATE_LIMIT_WAIT_MINUTES = 60
 
 def read_state(session_dir: Path) -> dict:
     state_path = session_dir / 'state.json'
-    return json.loads(state_path.read_text())
+    try:
+        return json.loads(state_path.read_text())
+    except (json.JSONDecodeError, OSError) as e:
+        raise RuntimeError(f"Failed to read state.json: {e}") from e
 
 
 def write_state(session_dir: Path, state: dict) -> None:
     state_path = session_dir / 'state.json'
     tmp_path = state_path.with_suffix(f'.tmp.{os.getpid()}')
-    tmp_path.write_text(json.dumps(state, indent=2))
-    os.rename(str(tmp_path), str(state_path))
+    try:
+        tmp_path.write_text(json.dumps(state, indent=2))
+        os.rename(str(tmp_path), str(state_path))
+    except OSError:
+        try:
+            tmp_path.unlink(missing_ok=True)
+        except OSError:
+            pass
+        # Fallback: direct write
+        state_path.write_text(json.dumps(state, indent=2))
 
 
 def log_activity(session_dir: Path, event: str, **kwargs) -> None:
@@ -91,6 +104,10 @@ def classify_output(output: str) -> str:
     """Classify iteration output by checking for signal tokens."""
     if SIGNAL_TOKENS['EPIC_COMPLETED'] in output:
         return 'epic_completed'
+    if SIGNAL_TOKENS['EXISTENCE_IS_PAIN'] in output:
+        return 'review_clean'
+    if SIGNAL_TOKENS['THE_CITADEL_APPROVES'] in output:
+        return 'review_clean'
     if SIGNAL_TOKENS['TASK_COMPLETED'] in output:
         return 'task_completed'
     if SIGNAL_TOKENS['PRD_COMPLETE'] in output:
@@ -260,7 +277,7 @@ def main():
             '--max-iterations', str(args.max_iterations),
             '--max-time', str(args.max_time),
         ]
-        result = subprocess.run(init_cmd, capture_output=True, text=True)
+        result = subprocess.run(init_cmd, capture_output=True, text=True, timeout=30)
         if result.returncode != 0:
             print(f"ERROR: Failed to initialize session:\n{result.stderr}")
             sys.exit(1)
@@ -367,6 +384,12 @@ def main():
             print(f"{'=' * 60}")
             log_activity(session_dir, 'epic_completed')
             break
+        
+        if classification == 'review_clean':
+            print(f"\n  Review pass clean (EXISTENCE IS PAIN / CITADEL APPROVES)")
+            log_activity(session_dir, 'review_clean', iteration=iteration)
+            # In meeseeks/council mode, clean pass may end the session
+            # if we've hit min_iterations (handled by the skill instructions)
         
         if classification == 'blocked':
             print(f"\n  Worker is BLOCKED. Check iteration log for details.")

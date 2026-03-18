@@ -246,7 +246,14 @@ Load the full persona from references/persona.md.
 
 ## Integration with Other Skills
 
-- **pickle-rick-meeseeks**: Chain after implementation for code review
+- **pickle-rick-meeseeks**: Chain after implementation for iterative code review
+- **pickle-rick-microverse**: Use for metric-driven convergence optimization
+- **pickle-rick-portal-gun**: Transplant patterns from donor repos, generates PRDs for pickle-rick
+- **pickle-rick-council**: Review stacked PRs with agent-executable directives
+- **pickle-rick-jar**: Queue multiple tasks for sequential batch execution
+- **pickle-rick-morty**: Worker lifecycle instructions (loaded by delegate_task workers)
+- **pickle-rick-tmux**: Launch sessions in tmux/Zellij with live monitor dashboard
+- **pickle-rick-help**: List all available commands and utilities
 - **subagent-driven-development**: Similar pattern, pickle-rick adds PRD and state management
 - **writing-plans**: Can generate the initial plan/PRD
 

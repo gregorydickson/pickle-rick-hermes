@@ -293,6 +293,48 @@ def cmd_metrics(args):
 
 
 # ---------------------------------------------------------------------------
+# Retry
+# ---------------------------------------------------------------------------
+
+def cmd_retry(args):
+    """Retry a failed or skipped ticket."""
+    session_dir = Path(args.session)
+    state_path = session_dir / 'state.json'
+    if not state_path.exists():
+        print(f"No state.json found at {session_dir}")
+        return
+    
+    try:
+        state = json.loads(state_path.read_text())
+    except (json.JSONDecodeError, OSError):
+        print("Could not read state.json")
+        return
+    
+    ticket_dir = session_dir / 'tickets' / args.ticket
+    ticket_file = ticket_dir / 'ticket.md'
+    if not ticket_file.exists():
+        print(f"Ticket {args.ticket} not found in {ticket_dir}")
+        return
+    
+    # Reset ticket status to Todo
+    content = ticket_file.read_text()
+    content = content.replace('status: Done', 'status: Todo')
+    content = content.replace('status: Skipped', 'status: Todo')
+    content = content.replace('status: Failed', 'status: Todo')
+    ticket_file.write_text(content)
+    
+    # Update state to point to this ticket
+    state['current_ticket'] = args.ticket
+    state['step'] = 'research'
+    state['active'] = True
+    state_path.write_text(json.dumps(state, indent=2))
+    
+    print(f"Ticket {args.ticket} reset to Todo")
+    print(f"Session reactivated at step: research")
+    print(f"Run the orchestrator to continue: mux_runner.py --resume {session_dir}")
+
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 
@@ -314,9 +356,14 @@ def main():
     p_metrics.add_argument('--days', type=int, default=7)
     p_metrics.add_argument('--session', help='Specific session directory')
     
+    p_retry = sub.add_parser('retry', help='Retry a failed/skipped ticket')
+    p_retry.add_argument('--session', '-s', required=True, help='Session directory')
+    p_retry.add_argument('--ticket', '-t', required=True, help='Ticket ID to retry')
+    
     args = parser.parse_args()
     {'status': cmd_status, 'cancel': cmd_cancel,
-     'standup': cmd_standup, 'metrics': cmd_metrics}[args.command](args)
+     'standup': cmd_standup, 'metrics': cmd_metrics,
+     'retry': cmd_retry}[args.command](args)
 
 
 if __name__ == '__main__':

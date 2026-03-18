@@ -74,7 +74,17 @@ class CircuitBreaker:
         }
     
     def _save(self) -> None:
-        self.state_file.write_text(json.dumps(self.state, indent=2))
+        tmp = self.state_file.with_suffix(f'.tmp.{os.getpid()}')
+        try:
+            tmp.write_text(json.dumps(self.state, indent=2))
+            os.rename(str(tmp), str(self.state_file))
+        except OSError:
+            try:
+                tmp.unlink(missing_ok=True)
+            except OSError:
+                pass
+            # Fallback: direct write (non-atomic but better than losing state)
+            self.state_file.write_text(json.dumps(self.state, indent=2))
     
     def _get_git_head(self) -> str:
         try:

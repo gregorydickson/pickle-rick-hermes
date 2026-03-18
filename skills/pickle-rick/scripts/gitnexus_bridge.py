@@ -146,7 +146,7 @@ def check_violations(repo_path: str, rules_file: str = None) -> dict:
             proc = subprocess.run(
                 ['npx', 'eslint', '.', '--format', 'json', '--quiet'],
                 capture_output=True, text=True,
-                cwd=repo_path, timeout=120
+                cwd=repo_path, timeout=120,
             )
             if proc.stdout:
                 try:
