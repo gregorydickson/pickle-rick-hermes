@@ -377,7 +377,7 @@ All defaults configurable via `~/.pickle-rick/pickle_settings.json`:
 | | |
 |---|---|
 | 🥒 **[galz10](https://github.com/galz10)** | Creator of the original [Pickle Rick Gemini CLI extension](https://github.com/galz10/pickle-rick-extension) — the autonomous lifecycle, manager/worker model, hook loop, and all the skill content that makes this thing work. |
-| 🔧 **[ATheorical](https://github.com/ATheorical)** | Author of [pickle-rick-claude](https://github.com/ATheorical/pickle-rick-claude) — the Claude Code port this Hermes version is based on. Portal Gun, Microverse, Council of Ricks, Project Mayhem, and the full toolbelt. |
+| 🔧 **[gregorydickson](https://github.com/gregorydickson)** | Author of [pickle-rick-claude](https://github.com/gregorydickson/pickle-rick-claude) — the Claude Code port this Hermes version is based on. Portal Gun, Microverse, Council of Ricks, Project Mayhem, and the full toolbelt. |
 | 🧠 **[Geoffrey Huntley](https://ghuntley.com)** | Inventor of the ["Ralph Wiggum" technique](https://ghuntley.com/ralph/) — the foundational insight that "Ralph is a Bash loop": feed an AI agent a prompt, block its exit, repeat until done. |
 | 🔧 **[AsyncFuncAI/ralph-wiggum-extension](https://github.com/AsyncFuncAI/ralph-wiggum-extension)** | Reference implementation of the Ralph Wiggum loop. |
 | ✍️ **[dexhorthy](https://github.com/dexhorthy)** | Context engineering and prompt techniques. |
