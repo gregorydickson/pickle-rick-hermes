@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="images/pickle-rick.png" alt="Pickle Rick for Hermes Agent" width="100%" />
+  <img src="images/pickle-rick.jpeg" alt="Pickle Rick for Hermes Agent" width="100%" />
 </p>
 
 # 🥒 Pickle Rick & 👋 Mr. Meeseeks for Hermes Agent
