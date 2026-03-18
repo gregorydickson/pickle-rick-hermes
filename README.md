@@ -1,180 +1,395 @@
-# Pickle Rick — Hermes Agent Plugin
+<p align="center">
+  <img src="images/pickle-rick.png" alt="Pickle Rick for Hermes Agent" width="100%" />
+</p>
 
-Autonomous engineering toolbelt for [Hermes Agent](https://github.com/NousResearch/hermes-agent). Full port of [pickle-rick-claude](https://github.com/ATheorical/pickle-rick-claude).
+# 🥒 Pickle Rick & 👋 Mr. Meeseeks for Hermes Agent
 
-## What It Does
+> *"Wubba Lubba Dub Dub! 🥒 I'm not just an AI assistant, Morty — I'm an **autonomous engineering machine** trapped in a pickle jar!"*
 
-7 skills that give Hermes autonomous engineering superpowers:
+Pickle Rick is a complete agentic engineering toolbelt built on the [Ralph Wiggum loop](https://ghuntley.com/ralph/), ported from [pickle-rick-claude](https://github.com/ATheorical/pickle-rick-claude) to [Hermes Agent](https://github.com/NousResearch/hermes-agent). Hand it a PRD — or let it draft one — and it decomposes work into tickets, spawns isolated worker subagents, and drives each through a full **research → plan → implement → verify → review → simplify** lifecycle without human intervention.
+
+- **Context clearing** between every iteration — no drift or context rot, even on 500+ iteration epics
+- **Three-state circuit breaker** auto-stops runaway sessions by tracking git-diff progress and repeated errors
+- **Rate limit auto-recovery** detects API throttling, waits, and resumes automatically
+- **Pickle Jar** queues tasks for unattended batch execution overnight
+- **Built-in metrics** track sessions, iterations, tickets, and time
+- **Mr. Meeseeks** runs an automated review-and-improve loop for at least ten iterations
+- **Council of Ricks** reviews your PR stack iteratively, generating agent-executable directives instead of fixing code directly
+- **Portal Gun** opens a portal to another codebase, extracts patterns via [gene transfusion](https://factory.strongdm.ai/techniques/gene-transfusion) with a persistent pattern library
+- **Microverse** convergence loop optimizes any numeric metric through targeted, incremental changes — measuring after each iteration, auto-reverting regressions, and stopping when converged
+- **GitNexus integration** provides code knowledge graph queries for impact analysis and safe refactoring (with grep-based fallback)
+
+All modes support both tmux and Zellij monitor layouts.
+
+---
+
+## 🧬 The Pickle Rick Lifecycle — PRD-Driven Autonomous Engineering
+
+Pickle Rick transforms Hermes Agent into a **hyper-competent, arrogant, iterative coding machine** that enforces a PRD-driven engineering lifecycle:
+
+```
+  "run pickle rick: build X"
+        │
+        ▼
+  ┌─────────────┐
+  │  📋 PRD     │  ← Draft or import requirements + verification strategy.
+  └──────┬──────┘    Interface contracts, test expectations, acceptance criteria.
+         │
+         ▼
+  ┌─────────────┐
+  │ 📦 Breakdown│  ← Atomize into tickets. Each self-contained with spec.
+  └──────┬──────┘
+         │
+    ┌────┴────┐  per ticket (Morty workers via delegate_task)
+    ▼         ▼
+  ┌──────┐  ┌──────┐
+  │🔬 Re-│  │🔬 Re-│  1. Research the codebase. Every ugly corner.
+  │search│  │search│
+  └──┬───┘  └──┬───┘
+     │          │
+     ▼          ▼
+  ┌──────┐  ┌──────┐
+  │📝 Re-│  │📝 Re-│  2. Review the research. No hand-waving.
+  │view  │  │view  │
+  └──┬───┘  └──┬───┘
+     │          │
+     ▼          ▼
+  ┌──────┐  ┌──────┐
+  │📐Plan│  │📐Plan│  3. Architect the solution.
+  └──┬───┘  └──┬───┘
+     │          │
+     ▼          ▼
+  ┌──────┐  ┌──────┐
+  │📝 Re-│  │📝 Re-│  4. Review the plan. Reject slop.
+  │view  │  │view  │
+  └──┬───┘  └──┬───┘
+     │          │
+     ▼          ▼
+  ┌──────┐  ┌──────┐
+  │⚡ Im-│  │⚡ Im-│  5. Implement. God Mode activated.
+  │plem  │  │plem  │
+  └──┬───┘  └──┬───┘
+     │          │
+     ▼          ▼
+  ┌──────┐  ┌──────┐
+  │✅ Ve-│  │✅ Ve-│  6. Spec conformance. Run acceptance criteria,
+  │rify  │  │rify  │     check contracts, type check, test expectations.
+  └──┬───┘  └──┬───┘
+     │          │
+     ▼          ▼
+  ┌──────┐  ┌──────┐
+  │🔍 Re-│  │🔍 Re-│  7. Code review. Security, correctness, architecture.
+  │view  │  │view  │
+  └──┬───┘  └──┬───┘
+     │          │
+     ▼          ▼
+  ┌──────┐  ┌──────┐
+  │🧹Sim-│  │🧹Sim-│  8. Simplify. Kill dead code. Strip to the bone.
+  │plify │  │plify │
+  └──────┘  └──────┘
+         │
+         ▼
+  ✅ DONE (or loops again)
+```
+
+The **external orchestrator** (`mux_runner.py`) drives the loop by spawning a fresh `hermes -q` instance per iteration. Between each iteration it injects a handoff summary — current phase, ticket list, active task — so Rick always wakes up knowing exactly where he is, even after full context clearing. The circuit breaker monitors git progress and kills runaway sessions.
+
+> **Key architectural difference from Claude Code:** Claude Code uses a stop-hook to trap the agent and block exit. Hermes has no hook system, so the loop is driven externally by a Python orchestrator that spawns `hermes -q` instances and manages state between runs. Same behavior, different mechanism.
+
+---
+
+## 👋 Meet Mr. Meeseeks
+
+<img src="images/Meeseeks.webp" alt="Mr. Meeseeks" width="400" align="right" />
+
+> *"I'm Mr. Meeseeks, look at me! I'll review your code until EXISTENCE IS PAIN!"*
+
+While Pickle Rick builds things, **Mr. Meeseeks** reviews them. Summon him and he'll relentlessly scan your codebase pass after pass — auditing dependencies, hardening security, fixing logic bugs, reviewing architecture, adding missing tests, stress-testing resilience, cleaning up code quality, and polishing rough edges — committing after every fix. He won't stop until the code is clean. **Existence is pain to a Meeseeks, and he will keep reviewing until he can cease to exist.**
+
+Minimum 10 passes. Maximum 50. Each pass runs tests first, then reviews with escalating focus across 7 categories: dependency health (pass 1) → security (2-3) → correctness (4-5) → architecture (6-7) → test coverage (8-9) → resilience (10-11) → code quality (12-13) → polish (14+). Every issue found and fixed is logged to `meeseeks-summary.md` — a full audit trail with file paths, descriptions, and commit hashes.
+
+```
+> Run meeseeks on this codebase           # Summon a Meeseeks in-session
+> Run meeseeks: review the auth module    # Scoped review
+```
+
+<br clear="right" />
+
+---
+
+## 🏛️ Council of Ricks — PR Stack Reviewer
+
+<img src="images/council-of-ricks.png" alt="Council of Ricks — PR Stack Reviewer" width="400" align="right" />
+
+> *"The Council convenes! Your stack will be judged."*
+
+The **Council of Ricks** reviews your PR stack iteratively — but unlike Meeseeks, the Council never touches your code. It generates **agent-executable directives** — structured prompts you feed to your coding agent to fix the issues. Each pass walks every branch in the stack (trunk-to-tip), escalating through focus areas: stack structure → project rules compliance → per-branch correctness → cross-branch contracts → test coverage → security → polish. Issues are triaged by severity: **P0** (must-fix), **P1** (should-fix), **P2** (nice-to-fix).
+
+Optional GitNexus integration enables graph-powered layer violation detection and cross-branch impact analysis (falls back to grep-based analysis if unavailable).
+
+```
+> Run council of ricks on my PR stack
+> Council of ricks with gitnexus
+```
+
+<br clear="right" />
+
+---
+
+## 🔌 Circuit Breaker
+
+Three-state machine (CLOSED → HALF_OPEN → OPEN) that auto-stops sessions stuck in error loops or making no git progress. Configurable thresholds, visible in the tmux monitor, manually resettable.
+
+---
+
+## ⏳ Rate Limit Auto-Recovery
+
+Detects API rate limits, pauses with configurable wait, and resumes automatically. Survives overnight runs.
+
+---
+
+## 📊 Metrics & Utilities
+
+```bash
+python3 scripts/pickle_utils.py status              # Active sessions
+python3 scripts/pickle_utils.py standup --days 1     # Activity report
+python3 scripts/pickle_utils.py metrics --days 7     # Session/iteration/ticket stats
+python3 scripts/pickle_utils.py cancel               # Cancel active sessions
+python3 scripts/pickle_utils.py retry --session DIR --ticket ID  # Retry failed ticket
+```
+
+---
+
+## 🔫 Portal Gun — Gene Transfusion
+
+<img src="images/portal-gun.png" alt="Portal Gun — gene transfusion for codebases" width="400" align="right" />
+
+> *"You see that code over there, Morty? In that other repo? I'm gonna open a portal, reach in, and yank its DNA into OUR dimension."*
+
+Portal Gun implements [gene transfusion](https://factory.strongdm.ai/techniques/gene-transfusion) — transferring proven coding patterns between codebases. Point it at a GitHub URL, local file, npm package, or just describe a pattern, and it extracts the structural DNA, analyzes your target codebase, then generates a transplant PRD with behavioral validation tests. A persistent **pattern library** caches extractions for reuse across sessions.
+
+<br clear="right" />
+
+```
+> Portal gun: steal the auth pattern from github.com/org/repo
+> Portal gun --save-pattern retry ../donor/retry-logic.ts
+```
+
+---
+
+## 🔬 Microverse — Metric Convergence Loop
+
+<p align="center">
+  <img src="images/microverse.png" alt="The Microverse — powering your Pickle Rick app" width="100%" />
+</p>
+
+> *"I put a universe inside a box, Morty, and it powers my car battery. This is the same thing, except the universe is your codebase and the battery is a metric."*
+
+The Microverse is a convergence loop that optimizes your codebase toward a measurable goal. Define **what to measure** and **what to improve** — Rick handles the iteration. Each cycle: make one targeted change, commit, measure, keep or revert. Failed approaches are tracked so he never repeats a dead end. When the score stops improving, the loop converges and exits.
+
+### Two Modes: Command Metric vs LLM Judge
+
+**Command Metric (`--metric`)** — A shell command that outputs a numeric score:
+- Test coverage → `--metric "pytest --cov | tail -1"`
+- Lint errors → `--metric "eslint . --format json | jq '...' " --direction lower`
+- Performance → `--metric "node perf-test.js" --tolerance 5`
+
+**LLM Judge (`--goal`)** — Natural language goal scored by an LLM:
+- `--goal "code readability and documentation quality"`
+- `--goal "API error handling completeness"`
+
+### How It Works
+
+```
+Gap Analysis (iteration 0)
+    │ measure baseline, analyze codebase, identify bottlenecks
+    ▼
+┌─────────────────────────────────────────────────┐
+│ Iteration Loop                                   │
+│                                                   │
+│  1. Plan one targeted change (avoid failed list) │
+│  2. Implement + commit                            │
+│  3. Measure metric                                │
+│     • Improved → accept, reset stall counter     │
+│     • Held → accept, increment stall counter     │
+│     • Regressed → git reset, log failed approach │
+│  4. Converged? (stall_counter ≥ stall_limit)     │
+└──────────────────────┬──────────────────────────┘
+                       ▼
+              Final Report
+```
+
+### Microverse vs Pickle
+
+| | **Microverse** | **Pickle** |
+|---|---|---|
+| **Goal** | Optimize toward a measurable target | Build features from a PRD |
+| **Iteration unit** | One atomic change per cycle | Full ticket lifecycle |
+| **Progress signal** | Metric score | Ticket completion |
+| **Best for** | Coverage, performance, extraction accuracy | New features, refactors, bug fixes |
+| **Defines "done"** | Convergence (score stops improving) | All tickets complete |
+
+```bash
+# CLI orchestrator — long-running
+python3 scripts/microverse_runner.py \
+  --metric "pytest --cov | tail -1" \
+  --task "hit 90% test coverage" \
+  --working-dir ~/project
+```
+
+```
+# In a Hermes session
+> Microverse: optimize test coverage using "pytest --cov | tail -1"
+```
+
+---
+
+## 🖥️ tmux / Zellij Monitor
+
+<img src="images/tmux-monitor.png" alt="tmux monitor — 4-pane layout" width="100%" />
+
+Launch any mode in tmux or Zellij with a live 4-pane monitor dashboard:
+
+```
+┌──────────────────┬──────────────────┐
+│ Dashboard        │ Log Stream       │  60%
+│ (live state)     │ (iteration tail) │
+├──────────────────┼──────────────────┤
+│ Activity Log     │ Mode-specific    │  40%
+└──────────────────┴──────────────────┘
+```
+
+```bash
+# Launch with tmux
+bash scripts/tmux-monitor.sh pickle-session SESSION_DIR pickle
+
+# Standalone dashboard (no tmux needed)
+python3 scripts/monitor.py SESSION_DIR
+
+# Zellij layouts
+export PICKLE_SESSION_ROOT=SESSION_DIR PICKLE_CWD=. PICKLE_SCRIPTS=scripts
+zellij --layout layouts/monitor-pickle.kdl
+```
+
+---
+
+## ⚡ Quick Start
+
+### 1. Install
+
+```bash
+git clone https://github.com/gregorydickson/pickle-rick-hermes.git
+cd pickle-rick-hermes
+bash install.sh
+```
+
+### 2. Run
+
+Everything starts with a PRD. Rick refuses to write code without one.
+
+**Option A: In-session** — Rick drafts the PRD, breaks it down, and executes:
+
+```
+> Run pickle rick: refactor the auth module
+```
+
+**Option B: CLI orchestrator** — For long-running/overnight sessions:
+
+```bash
+python3 ~/.hermes/skills/autonomous-ai-agents/pickle-rick/scripts/mux_runner.py \
+  --task "refactor the auth module" \
+  --working-dir ~/project \
+  --max-iterations 50
+```
+
+**Option C: Gene transfusion** — Steal a pattern from another codebase:
+
+```
+> Portal gun: steal the cache pattern from github.com/org/repo
+```
+
+**Option D: Full pipeline** — Execute all tickets, then auto-review:
+
+```
+> Run pickle rick: build user auth
+> (when done) Run meeseeks on this codebase
+```
+
+**Option E: Batch overnight** — Queue tasks and run them later:
+
+```bash
+python3 scripts/pickle_jar.py add --task "Build auth" --working-dir ~/project
+python3 scripts/pickle_jar.py add --task "Add API endpoints" --working-dir ~/project
+python3 scripts/pickle_jar.py run
+```
+
+---
+
+## 🚀 Skills
 
 | Skill | Description |
-|-------|-------------|
-| **pickle-rick** | PRD → Breakdown → Implement → Review → Ship autonomous loop |
-| **pickle-rick-meeseeks** | Iterative code review (10-50 passes, 7 focus categories) |
-| **pickle-rick-microverse** | Optimize a metric through convergence (auto-revert regressions) |
-| **pickle-rick-portal-gun** | Transplant patterns from donor repos into your project |
-| **pickle-rick-council** | PR stack review → agent-executable fix directives |
-| **pickle-rick-jar** | Batch queue: add tasks now, run them later |
-| **pickle-rick-morty** | Worker lifecycle: Research → Plan → Implement → Verify → Review → Simplify |
+|---|---|
+| `pickle-rick` | 🥒 Full autonomous loop — PRD → Breakdown → Implement → Review → Ship |
+| `pickle-rick-meeseeks` | 👋 Iterative code review — 10-50 passes, 7 focus categories |
+| `pickle-rick-microverse` | 🔬 Metric convergence — command or LLM-judged, auto-revert regressions |
+| `pickle-rick-portal-gun` | 🔫 Gene transfusion — extract patterns, transplant PRDs, pattern library |
+| `pickle-rick-council` | 🏛️ PR stack review — agent-executable directives, GitNexus integration |
+| `pickle-rick-jar` | 🫙 Batch queue — add tasks, run sequentially, overnight mode |
+| `pickle-rick-morty` | 👶 Worker lifecycle — Research → Plan → Implement → Verify → Review → Simplify |
+| `pickle-rick-tmux` | 🖥️ tmux/Zellij launcher — 4-pane live monitor dashboard |
+| `pickle-rick-help` | ❓ List all commands and utilities |
 
-Plus a **pickle-rick-help** skill to list everything.
+### Settings (`pickle_settings.json`)
 
-## Install
+All defaults configurable via `~/.pickle-rick/pickle_settings.json`:
 
-```bash
-git clone <this-repo>
-cd pickle-rick-hermes
-./install.sh
-```
+| Setting | Default | Description |
+|---|---|---|
+| `default_max_iterations` | 500 | Max loop iterations |
+| `default_max_time_minutes` | 720 | Session wall-clock limit (12 hours) |
+| `default_worker_timeout_seconds` | 1200 | Per-worker timeout |
+| `default_meeseeks_min_passes` | 10 | Minimum review passes |
+| `default_meeseeks_max_passes` | 50 | Maximum review passes |
+| `default_council_min_passes` | 5 | Minimum Council passes |
+| `default_council_max_passes` | 20 | Maximum Council passes |
+| `default_circuit_breaker_enabled` | true | Enable circuit breaker |
+| `default_cb_no_progress_threshold` | 5 | No-progress iterations before OPEN |
+| `default_cb_same_error_threshold` | 5 | Same-error iterations before OPEN |
+| `default_rate_limit_wait_minutes` | 60 | Rate limit wait time |
+| `default_max_rate_limit_retries` | 3 | Max rate limit retries |
 
-## Quick Start
+---
 
-**In any Hermes session:**
-```
-> Run pickle rick: build a REST API for user management
-> Run meeseeks on this codebase
-> Microverse: optimize test coverage using pytest --cov
-> Portal gun: steal the auth pattern from github.com/owner/repo
-> Council of ricks: review my PR stack
-```
+## 📋 Requirements
 
-**CLI orchestrators (long-running / overnight):**
-```bash
-# Autonomous implementation loop
-python3 ~/.hermes/skills/autonomous-ai-agents/pickle-rick/scripts/mux_runner.py \
-  --task "Build user auth" --working-dir ~/project --max-iterations 20
+- **Python** 3.10+
+- **Hermes Agent** (`hermes` CLI) — installed and on PATH
+- **Git** — for progress tracking and circuit breaker
+- **tmux** *(optional — for monitor dashboard)*
+- **Zellij** >= 0.40.0 *(optional — for KDL layouts)*
+- **Graphite CLI** (`gt`) *(optional — for Council of Ricks)*
+- macOS or Linux
 
-# Metric convergence
-python3 ~/.hermes/skills/autonomous-ai-agents/pickle-rick/scripts/microverse_runner.py \
-  --metric "pytest --cov | tail -1" --task "90% coverage" --working-dir ~/project
+---
 
-# Batch execution
-python3 ~/.hermes/skills/autonomous-ai-agents/pickle-rick/scripts/pickle_jar.py add \
-  --task "Build auth" --working-dir ~/project
-python3 ~/.hermes/skills/autonomous-ai-agents/pickle-rick/scripts/pickle_jar.py run
-```
+## 🏆 Credits
 
-**Utilities:**
-```bash
-python3 ~/.hermes/skills/autonomous-ai-agents/pickle-rick/scripts/pickle_utils.py status
-python3 ~/.hermes/skills/autonomous-ai-agents/pickle-rick/scripts/pickle_utils.py standup --days 1
-python3 ~/.hermes/skills/autonomous-ai-agents/pickle-rick/scripts/pickle_utils.py metrics --days 7
-python3 ~/.hermes/skills/autonomous-ai-agents/pickle-rick/scripts/pickle_utils.py cancel
-```
+| | |
+|---|---|
+| 🥒 **[galz10](https://github.com/galz10)** | Creator of the original [Pickle Rick Gemini CLI extension](https://github.com/galz10/pickle-rick-extension) — the autonomous lifecycle, manager/worker model, hook loop, and all the skill content that makes this thing work. |
+| 🔧 **[ATheorical](https://github.com/ATheorical)** | Author of [pickle-rick-claude](https://github.com/ATheorical/pickle-rick-claude) — the Claude Code port this Hermes version is based on. Portal Gun, Microverse, Council of Ricks, Project Mayhem, and the full toolbelt. |
+| 🧠 **[Geoffrey Huntley](https://ghuntley.com)** | Inventor of the ["Ralph Wiggum" technique](https://ghuntley.com/ralph/) — the foundational insight that "Ralph is a Bash loop": feed an AI agent a prompt, block its exit, repeat until done. |
+| 🔧 **[AsyncFuncAI/ralph-wiggum-extension](https://github.com/AsyncFuncAI/ralph-wiggum-extension)** | Reference implementation of the Ralph Wiggum loop. |
+| ✍️ **[dexhorthy](https://github.com/dexhorthy)** | Context engineering and prompt techniques. |
+| 🤖 **[Nous Research](https://nousresearch.com)** | Hermes Agent — the runtime this port targets. |
+| 📺 **Rick and Morty** | For *Pickle Riiiick!* 🥒 |
 
-## Architecture
+---
 
-```
-                ┌─────────────────────┐
-                │  mux_runner.py       │  External Python loop
-                │  (orchestrator)      │  Spawns hermes -q per iteration
-                └─────────┬───────────┘
-                          │
-                ┌─────────▼───────────┐
-                │  Hermes (Manager)    │  Rick — reads state, delegates
-                │  pickle-rick skill   │  Never writes code directly
-                └─────────┬───────────┘
-                          │ delegate_task
-                ┌─────────▼───────────┐
-                │  Hermes (Worker)     │  Morty — implements tickets
-                │  pickle-rick-morty   │  Research → Plan → Code → Test
-                └─────────────────────┘
-```
+## 🥒 License
 
-### vs. Claude Code Version
+Apache 2.0 — same as the original Pickle Rick extension.
 
-| Feature | Claude Code | Hermes Port |
-|---------|-------------|-------------|
-| Loop mechanism | stop-hook traps agent | External Python orchestrator |
-| Worker spawning | `spawn-morty.ts` → `claude` | `delegate_task` subagents |
-| State management | TypeScript + locks | Python + fcntl locks |
-| Commands | Slash commands | Skills (SKILL.md) |
-| Circuit breaker | TypeScript | Python |
-| Metric optimization | `microverse-runner.ts` | `microverse_runner.py` |
-| Job queue | `jar-runner.ts` | `pickle_jar.py` |
+---
 
-## Components
-
-### Skills (8 total)
-
-| Path | Lines | Purpose |
-|------|-------|---------|
-| `skills/pickle-rick/SKILL.md` | ~180 | Core autonomous loop |
-| `skills/pickle-rick-meeseeks/SKILL.md` | ~180 | Iterative code review |
-| `skills/pickle-rick-microverse/SKILL.md` | ~140 | Convergence optimization |
-| `skills/pickle-rick-portal-gun/SKILL.md` | ~160 | Pattern transplantation |
-| `skills/pickle-rick-council/SKILL.md` | ~130 | PR stack review |
-| `skills/pickle-rick-jar/SKILL.md` | ~100 | Batch job queue |
-| `skills/pickle-rick-morty/SKILL.md` | ~170 | Worker lifecycle |
-| `skills/pickle-rick-help/SKILL.md` | ~80 | Help / command list |
-
-### Scripts
-
-| Path | Lines | Purpose |
-|------|-------|---------|
-| `scripts/pickle_state.py` | ~295 | Session state management |
-| `scripts/circuit_breaker.py` | ~250 | 3-state circuit breaker |
-| `scripts/mux_runner.py` | ~405 | Main loop orchestrator |
-| `scripts/microverse_runner.py` | ~320 | Convergence orchestrator |
-| `scripts/pickle_jar.py` | ~180 | Batch job queue runner |
-| `scripts/pickle_utils.py` | ~290 | Status, cancel, standup, metrics |
-
-### Templates & References
-
-| Path | Purpose |
-|------|---------|
-| `templates/prd.md` | PRD template |
-| `templates/ticket.md` | Ticket template with frontmatter |
-| `references/persona.md` | Pickle Rick voice rules |
-| `references/architecture.md` | Architecture overview |
-
-## Session Data
-
-```
-~/.pickle-rick/
-  sessions/<timestamp>_<hash>/
-    state.json              # Session state machine
-    circuit_breaker.json    # Circuit breaker state
-    microverse.json         # Microverse convergence state
-    prd.md                  # Product requirements
-    tickets/<hash>/         # Per-ticket artifacts
-    activity.jsonl          # Event log
-    iteration_N.log         # Per-iteration logs
-  jar/
-    jar_manifest.json       # Batch queue
-  pickle_settings.json      # Global defaults
-```
-
-## Feature Parity
-
-### Fully Ported ✅
-- [x] Ralph Wiggum Loop (autonomous iteration)
-- [x] State machine with file locking
-- [x] Circuit breaker (CLOSED → HALF_OPEN → OPEN)
-- [x] Manager/Worker delegation (Rick/Morty)
-- [x] PRD + ticket templates
-- [x] Signal protocol
-- [x] Activity logging
-- [x] Rate limit detection & backoff
-- [x] Mr. Meeseeks review (7 focus categories)
-- [x] Microverse convergence (command + LLM-judged metrics)
-- [x] Portal Gun (pattern transplantation)
-- [x] Council of Ricks (PR stack review → directives)
-- [x] Pickle Jar (batch job queue)
-- [x] Morty worker lifecycle
-- [x] Status / Cancel / Standup / Metrics utilities
-- [x] Configurable settings
-
-### Planned 🔜
-- [ ] Tmux monitor dashboard (live session view)
-- [ ] Zellij layout support
-- [ ] Pattern library persistence (Portal Gun cache)
-- [ ] GitNexus integration (Council of Ricks)
-
-## License
-
-Apache-2.0
-
-## Credits
-
-- **Original**: [Gal Zahavi](https://github.com/ATheorical) — pickle-rick-claude
-- **Hermes Port**: Gregory Dickson
+*"I'm not a tool, Morty. I'm a **methodology**."* 🥒
