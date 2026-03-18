@@ -136,9 +136,14 @@ def render(session_dir: Path) -> bool:
     if len(task) > width - 20:
         task = task[:width - 23] + '...'
     
+    mode = state.get('mode', 'pickle')
+    mode_labels = {'pickle': '🥒 pickle', 'meeseeks': '👋 meeseeks',
+                   'council': '🏛️ council', 'microverse': '🔬 microverse'}
+    mode_display = mode_labels.get(mode, mode)
     fields = [
         ('Project', f"{MX.BRIGHT}{project}{MX.R}"),
         ('Task', f"{MX.GREEN}{task or 'none'}{MX.R}"),
+        ('Mode', f"{MX.CYAN}{mode_display}{MX.R}"),
         ('Phase', f"{MX.CYAN}{state.get('step', 'unknown')}{MX.R}"),
         ('Iteration', f"{MX.GREEN}{iter_str}{MX.R}"),
         ('Elapsed', f"{MX.GREEN}{time_str}{MX.R}"),

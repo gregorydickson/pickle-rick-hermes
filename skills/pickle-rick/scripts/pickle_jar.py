@@ -59,6 +59,7 @@ def cmd_add(args):
         'task': args.task,
         'working_dir': os.path.abspath(args.working_dir or os.getcwd()),
         'max_iterations': args.max_iterations,
+        'mode': getattr(args, 'mode', 'pickle') or 'pickle',
         'status': 'queued',
         'added_at': datetime.datetime.now().isoformat(),
         'completed_at': None,
@@ -87,8 +88,9 @@ def cmd_list(args):
     for i, t in enumerate(tasks, 1):
         status_icon = {'queued': '[ ]', 'running': '[>]', 'done': '[x]', 
                        'failed': '[!]', 'skipped': '[-]'}.get(t['status'], '[?]')
+        mode = t.get('mode', 'pickle')
         print(f"  {status_icon} {i}. [{t['id']}] {t['task']}")
-        print(f"       Dir: {t['working_dir']} | Max: {t['max_iterations']} iter")
+        print(f"       Dir: {t['working_dir']} | Mode: {mode} | Max: {t['max_iterations']} iter")
         if t.get('chain_meeseeks'):
             print(f"       + Meeseeks chained")
         if t.get('session_dir'):
@@ -120,11 +122,13 @@ def cmd_run(args):
         task['status'] = 'running'
         save_manifest(manifest)
         
+        task_mode = task.get('mode', 'pickle')
         cmd = [
             sys.executable, str(SCRIPTS_DIR / 'mux_runner.py'),
             '--task', task['task'],
             '--working-dir', task['working_dir'],
             '--max-iterations', str(task['max_iterations']),
+            '--mode', task_mode,
         ]
         
         try:
@@ -163,6 +167,8 @@ def main():
     p_add.add_argument('--task', '-t', required=True)
     p_add.add_argument('--working-dir', '-w')
     p_add.add_argument('--max-iterations', type=int, default=100)
+    p_add.add_argument('--mode', choices=['pickle', 'meeseeks', 'council', 'microverse'],
+                        default='pickle', help='Session mode')
     p_add.add_argument('--chain-meeseeks', action='store_true')
     
     sub.add_parser('list')

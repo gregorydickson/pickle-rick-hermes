@@ -24,6 +24,7 @@ def tmp_session(tmp_path):
         'active': True,
         'working_dir': str(tmp_path),
         'step': 'prd',
+        'mode': 'pickle',
         'iteration': 0,
         'max_iterations': 100,
         'max_time_minutes': 720,

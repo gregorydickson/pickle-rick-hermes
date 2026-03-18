@@ -30,6 +30,7 @@ SCRIPTS_DIR = Path(__file__).parent
 sys.path.insert(0, str(SCRIPTS_DIR))
 
 from circuit_breaker import CircuitBreaker
+from pickle_state import locked_write
 
 
 def get_git_head(working_dir: str) -> str:
@@ -264,6 +265,7 @@ def main():
             'init', '--task', args.task,
             '--working-dir', working_dir,
             '--max-iterations', str(args.max_iterations),
+            '--mode', 'microverse',
         ]
         result = subprocess.run(init_cmd, capture_output=True, text=True, timeout=30)
         for line in result.stdout.strip().split('\n'):
@@ -443,7 +445,7 @@ def main():
         
         iteration += 1
         state['iteration'] = iteration
-        (session_dir / 'state.json').write_text(json.dumps(state, indent=2))
+        locked_write(session_dir / 'state.json', state)
     
     if iteration >= max_iter:
         mv_state['status'] = 'stopped'
