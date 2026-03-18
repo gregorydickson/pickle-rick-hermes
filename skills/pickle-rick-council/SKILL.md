@@ -118,6 +118,34 @@ In a Hermes session:
 - Pass 8+: weary; Pass 12+: impatient; Pass 18+: Evil Morty energy
 - NEVER fixes code — generates directives only
 
+## GitNexus Integration
+
+When available, GitNexus provides code knowledge graph queries for deeper analysis:
+
+```bash
+# Check if GitNexus is available
+terminal(command="python3 ~/.hermes/skills/autonomous-ai-agents/pickle-rick/scripts/gitnexus_bridge.py check")
+
+# Run analysis on the repo
+terminal(command="python3 ~/.hermes/skills/autonomous-ai-agents/pickle-rick/scripts/gitnexus_bridge.py analyze --repo .")
+
+# Query the code graph
+terminal(command="python3 ~/.hermes/skills/autonomous-ai-agents/pickle-rick/scripts/gitnexus_bridge.py query --repo . --query 'what imports auth.ts'")
+
+# Check for architectural violations (uses ESLint boundaries plugin)
+terminal(command="python3 ~/.hermes/skills/autonomous-ai-agents/pickle-rick/scripts/gitnexus_bridge.py violations --repo .")
+```
+
+### When GitNexus Is Available (Passes 2-3, 6-7)
+- Query the graph for layer violations and dependency chains
+- Cross-reference import graphs for cross-branch contract analysis
+- Detect circular dependencies introduced by the PR stack
+
+### Fallback (No GitNexus)
+- Uses grep-based import analysis automatically
+- ESLint boundary rules still checked if configured
+- Less precise but functional for most review needs
+
 ## Settings
 
 | Setting | Default | Description |

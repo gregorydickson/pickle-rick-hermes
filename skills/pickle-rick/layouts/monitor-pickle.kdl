@@ -1,0 +1,28 @@
+layout {
+    tab name="runner" {
+        pane command="sh" {
+            args "-c" "exec python3 $PICKLE_SCRIPTS/mux_runner.py --resume $PICKLE_SESSION_ROOT"
+            cwd "$PICKLE_CWD"
+        }
+    }
+    tab name="monitor" focus=true {
+        pane split_direction="vertical" {
+            pane split_direction="horizontal" {
+                pane command="sh" {
+                    args "-c" "exec python3 $PICKLE_SCRIPTS/monitor.py $PICKLE_SESSION_ROOT"
+                }
+                pane command="sh" {
+                    args "-c" "exec tail -F $PICKLE_SESSION_ROOT/iteration_*.log 2>/dev/null || sleep 999"
+                }
+            }
+            pane split_direction="horizontal" size="40%" {
+                pane command="sh" {
+                    args "-c" "exec tail -F $PICKLE_SESSION_ROOT/activity.jsonl 2>/dev/null || sleep 999"
+                }
+                pane command="sh" {
+                    args "-c" "exec python3 $PICKLE_SCRIPTS/pickle_utils.py status --active-only 2>/dev/null; sleep 999"
+                }
+            }
+        }
+    }
+}

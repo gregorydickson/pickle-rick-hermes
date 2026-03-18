@@ -17,7 +17,7 @@ mkdir -p "${HOME}/.pickle-rick/sessions"
 mkdir -p "${HOME}/.pickle-rick/jar"
 
 # Skills to install (each gets its own directory)
-SKILLS=(pickle-rick pickle-rick-meeseeks pickle-rick-microverse pickle-rick-portal-gun pickle-rick-council pickle-rick-jar pickle-rick-morty pickle-rick-help)
+SKILLS=(pickle-rick pickle-rick-meeseeks pickle-rick-microverse pickle-rick-portal-gun pickle-rick-council pickle-rick-jar pickle-rick-morty pickle-rick-help pickle-rick-tmux)
 
 for skill in "${SKILLS[@]}"; do
     src="${SCRIPT_DIR}/skills/${skill}"
@@ -43,6 +43,14 @@ cp "${SCRIPT_DIR}/skills/pickle-rick/templates/"* "${PICKLE_DIR}/templates/" 2>/
 echo "  Copying scripts..."
 cp "${SCRIPT_DIR}/skills/pickle-rick/scripts/"* "${PICKLE_DIR}/scripts/" 2>/dev/null || true
 chmod +x "${PICKLE_DIR}/scripts/"*.py 2>/dev/null || true
+chmod +x "${PICKLE_DIR}/scripts/"*.sh 2>/dev/null || true
+
+# Copy layouts
+if [ -d "${SCRIPT_DIR}/skills/pickle-rick/layouts" ]; then
+    echo "  Copying Zellij layouts..."
+    mkdir -p "${PICKLE_DIR}/layouts"
+    cp "${SCRIPT_DIR}/skills/pickle-rick/layouts/"* "${PICKLE_DIR}/layouts/" 2>/dev/null || true
+fi
 
 # Copy default settings
 if [ -f "${SCRIPT_DIR}/pickle_settings.json" ]; then

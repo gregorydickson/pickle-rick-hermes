@@ -180,6 +180,40 @@ Feed the PRD to pickle-rick for autonomous implementation:
   validation_report.md # PRD path validation
 ```
 
+## Pattern Library (Persistence)
+
+Save extracted patterns for reuse across sessions:
+
+```bash
+# Save after extraction
+terminal(command="python3 ~/.hermes/skills/autonomous-ai-agents/pickle-rick/scripts/pattern_library.py save --name 'auth-jwt' --source 'github.com/owner/repo' --analysis SESSION_DIR/portal/pattern_analysis.md --summary 'JWT auth with refresh tokens'")
+
+# Search before extracting (check if pattern already cached)
+terminal(command="python3 ~/.hermes/skills/autonomous-ai-agents/pickle-rick/scripts/pattern_library.py search --query 'auth'")
+
+# List all saved patterns
+terminal(command="python3 ~/.hermes/skills/autonomous-ai-agents/pickle-rick/scripts/pattern_library.py list")
+
+# Load a cached pattern
+terminal(command="python3 ~/.hermes/skills/autonomous-ai-agents/pickle-rick/scripts/pattern_library.py get --name 'auth-jwt'")
+```
+
+### Auto-Save Decision Tree
+
+1. `--save-pattern <name>` flag set → save immediately, no prompt
+2. Flag not set AND refinement ran → ask user: "Save pattern to library?"
+3. Flag not set AND `--no-refine` → skip with hint
+
+### Before Extraction: Check Library
+
+In Step 3a, before analyzing donor code:
+1. Search the pattern library for matching patterns
+2. On exact match (same source): use cached analysis as baseline, verify against current donor
+3. On partial match (related source): use as cross-reference context
+4. On no match: full fresh analysis
+
+Patterns stored in `~/.pickle-rick/patterns/<name>/pattern_analysis.md`
+
 ## Pitfalls
 
 1. **Always validate paths** — PRDs with wrong paths create broken tickets
@@ -187,3 +221,4 @@ Feed the PRD to pickle-rick for autonomous implementation:
 3. **Classify files before transplanting** — not everything needs to be copied
 4. **Adapt conventions** — donor patterns must match target style
 5. **Test invariants** — every invariant needs a behavioral validation test
+6. **Check library first** — don't re-extract patterns you've already cached

@@ -1,0 +1,28 @@
+layout {
+    tab name="runner" {
+        pane command="sh" {
+            args "-c" "exec python3 $PICKLE_SCRIPTS/microverse_runner.py --resume $PICKLE_SESSION_ROOT"
+            cwd "$PICKLE_CWD"
+        }
+    }
+    tab name="monitor" focus=true {
+        pane split_direction="vertical" {
+            pane split_direction="horizontal" {
+                pane command="sh" {
+                    args "-c" "exec python3 $PICKLE_SCRIPTS/monitor.py $PICKLE_SESSION_ROOT"
+                }
+                pane command="sh" {
+                    args "-c" "exec tail -F $PICKLE_SESSION_ROOT/microverse_iter_*.log 2>/dev/null || sleep 999"
+                }
+            }
+            pane split_direction="horizontal" size="40%" {
+                pane command="sh" {
+                    args "-c" "watch -n 5 python3 -c \"import json,sys; m=json.load(open('$PICKLE_SESSION_ROOT/microverse.json')); h=m['convergence']['history'][-10:]; print(f'Status: {m[\\\"status\\\"]}  Stall: {m[\\\"convergence\\\"][\\\"stall_counter\\\"]}/{m[\\\"convergence\\\"][\\\"stall_limit\\\"]}  Baseline: {m.get(\\\"baseline_score\\\",\\\"?\\\")}'); [print(f'  iter {e[\\\"iteration\\\"]}: {e[\\\"score\\\"]} [{e[\\\"action\\\"]}] {e.get(\\\"description\\\",\\\"\\\")}') for e in h]\""
+                }
+                pane command="sh" {
+                    args "-c" "exec tail -F $PICKLE_SESSION_ROOT/activity.jsonl 2>/dev/null || sleep 999"
+                }
+            }
+        }
+    }
+}
