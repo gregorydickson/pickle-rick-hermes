@@ -275,13 +275,37 @@ zellij --layout layouts/monitor-pickle.kdl
 
 ## ⚡ Quick Start
 
-### 1. Install
+## Install
+
+### Option A: Full Install (recommended)
 
 ```bash
 git clone https://github.com/gregorydickson/pickle-rick-hermes.git
 cd pickle-rick-hermes
-bash install.sh
+./install.sh
 ```
+
+This installs all 16 skills, Python scripts, Zellij layouts, default settings,
+and appends the Pickle Rick persona to `~/.hermes/SOUL.md`.
+
+### Option B: Hermes Skills Hub
+
+```bash
+# Add as a tap (one-time)
+hermes skills tap add gregorydickson/pickle-rick-hermes
+
+# Search available skills
+hermes skills search pickle-rick
+
+# Install individual skills
+hermes skills install gregorydickson/pickle-rick-hermes/skills/pickle-rick
+hermes skills install gregorydickson/pickle-rick-hermes/skills/pickle-rick-meeseeks
+# ... etc for each skill you want
+```
+
+> **Note:** The hub install only copies SKILL.md files. For the full experience
+> (Python orchestrator scripts, tmux monitor, persona in SOUL.md, settings),
+> use Option A.
 
 ### 2. Run
 
