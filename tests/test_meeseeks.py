@@ -1,4 +1,4 @@
-"""Tests for meeseeks mode in mux_runner.py and pickle_state.py."""
+"""Tests for meeseeks and council modes in mux_runner.py and pickle_state.py."""
 
 import json
 import sys
@@ -11,6 +11,7 @@ sys.path.insert(0, str(SCRIPTS))
 from mux_runner import (
     MEESEEKS_PASS_SCHEDULE, get_meeseeks_category,
     build_meeseeks_prompt, transition_to_meeseeks, build_prompt,
+    COUNCIL_PASS_SCHEDULE, get_council_category, build_council_prompt,
 )
 from pickle_state import VALID_STEPS, DEFAULT_STATE
 
@@ -286,9 +287,87 @@ class TestStateSchema:
     def test_meeseeks_in_valid_steps(self):
         assert 'meeseeks' in VALID_STEPS
 
+    def test_council_in_valid_steps(self):
+        assert 'council' in VALID_STEPS
+
     def test_review_in_valid_steps(self):
         assert 'review' in VALID_STEPS
 
     def test_default_state_has_mode(self):
         assert 'mode' in DEFAULT_STATE
         assert DEFAULT_STATE['mode'] == 'pickle'
+
+
+# ---------------------------------------------------------------------------
+# Council Pass Schedule
+# ---------------------------------------------------------------------------
+
+class TestCouncilPassSchedule:
+    def test_schedule_has_7_entries(self):
+        assert len(COUNCIL_PASS_SCHEDULE) == 7
+
+    def test_schedule_pass_1(self):
+        cat, desc = get_council_category(1)
+        assert cat == 'stack_structure'
+
+    def test_schedule_project_rules(self):
+        for p in (2, 3):
+            cat, _ = get_council_category(p)
+            assert cat == 'project_rules'
+
+    def test_schedule_correctness(self):
+        for p in (4, 5):
+            cat, _ = get_council_category(p)
+            assert cat == 'correctness'
+
+    def test_schedule_cross_branch(self):
+        for p in (6, 7):
+            cat, _ = get_council_category(p)
+            assert cat == 'cross_branch'
+
+    def test_schedule_polish_high_pass(self):
+        cat, _ = get_council_category(50)
+        assert cat == 'polish'
+
+
+class TestBuildCouncilPrompt:
+    def _make_state(self, iteration=0, **overrides):
+        state = {
+            'active': True, 'working_dir': '/tmp/project',
+            'step': 'council', 'mode': 'council',
+            'iteration': iteration, 'max_iterations': 20,
+            'min_iterations': 5,
+            'original_prompt': 'Review my PR stack',
+            'history': [],
+        }
+        state.update(overrides)
+        return state
+
+    def test_prompt_contains_pass_number(self, tmp_path):
+        state = self._make_state(iteration=2)
+        prompt = build_council_prompt(state, tmp_path, 2)
+        assert 'Pass 3' in prompt or 'pass 3' in prompt
+
+    def test_prompt_contains_category(self, tmp_path):
+        state = self._make_state(iteration=0)
+        prompt = build_council_prompt(state, tmp_path, 0)
+        assert 'STACK STRUCTURE' in prompt
+
+    def test_prompt_contains_signal_tokens(self, tmp_path):
+        state = self._make_state()
+        prompt = build_council_prompt(state, tmp_path, 0)
+        assert '[TASK_COMPLETED]' in prompt
+        assert '[THE_CITADEL_APPROVES]' in prompt
+        assert '[BLOCKED]' in prompt
+
+    def test_prompt_never_fixes_code(self, tmp_path):
+        state = self._make_state()
+        prompt = build_council_prompt(state, tmp_path, 0)
+        assert 'NEVER fix' in prompt or 'directives only' in prompt.lower()
+
+    def test_council_mode_in_build_prompt(self, tmp_path):
+        session = tmp_path / 'session'
+        session.mkdir()
+        state = self._make_state()
+        prompt = build_prompt(state, session, 0)
+        assert 'Council of Ricks' in prompt

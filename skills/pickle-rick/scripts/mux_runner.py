@@ -324,6 +324,92 @@ def transition_to_meeseeks(state: dict, settings_path: Path = None) -> dict:
     }
 
 
+COUNCIL_PASS_SCHEDULE = [
+    ((1, 1), 'stack_structure', 'PR sizing, split candidates, commit hygiene, branch naming, ordering'),
+    ((2, 3), 'project_rules', 'Verify rules from AGENTS.md/CLAUDE.md/eslint per branch diff'),
+    ((4, 5), 'correctness', 'Logic bugs, types, error handling, null safety per branch'),
+    ((6, 7), 'cross_branch', 'API contracts between PRs, shared types, state assumptions'),
+    ((8, 9), 'test_coverage', 'Test adequacy per branch, integration gaps'),
+    ((10, 11), 'security', 'Input validation, auth gaps, injection, secrets'),
+    ((12, 999), 'polish', 'PR descriptions, naming, dead code, style drift'),
+]
+
+
+def get_council_category(pass_num: int) -> tuple:
+    """Map a 1-based pass number to (category, description) for council."""
+    for (lo, hi), category, description in COUNCIL_PASS_SCHEDULE:
+        if lo <= pass_num <= hi:
+            return category, description
+    return 'polish', 'General polish'
+
+
+def build_council_prompt(state: dict, session_dir: Path, iteration: int) -> str:
+    """Build a single-pass Council of Ricks review prompt."""
+    pass_num = iteration + 1
+    category, description = get_council_category(pass_num)
+    persona = load_persona()
+    min_iter = state.get('min_iterations', 5)
+    max_iter = state.get('max_iterations', 20)
+
+    summary_path = session_dir / 'council-summary.md'
+    prev_summary = ''
+    try:
+        if summary_path.exists():
+            content = summary_path.read_text()
+            if len(content) > 2000:
+                prev_summary = '...\n' + content[-2000:]
+            else:
+                prev_summary = content
+    except OSError:
+        pass
+
+    prompt = f"""You are the Council of Ricks running a single PR stack review pass.
+
+{persona}
+
+"The Council convenes! Pass {pass_num}!"
+
+## Context
+SESSION DIRECTORY: {session_dir}
+WORKING DIRECTORY: {state['working_dir']}
+PASS NUMBER: {pass_num} of {max_iter} (min passes: {min_iter})
+FOCUS CATEGORY: {category}
+TASK: {state['original_prompt']}
+
+## Your Mission (Single Pass)
+
+You are running **pass {pass_num}** of a Council of Ricks review.
+Each pass runs in FRESH context (clean hermes -q spawn).
+The Council NEVER fixes code — it generates **agent-executable directives** only.
+
+### Focus: {category.upper().replace('_', ' ')}
+{description}
+
+### Steps
+
+1. **Discover branches**: `git branch` or `gt log short` (if Graphite available)
+2. **Read project rules**: Look for AGENTS.md, CLAUDE.md, eslint config, etc.
+3. **Walk the stack** (trunk to tip): For each branch, get the diff and review against focus
+4. **Track issues**: branch + file:line + severity (P0/P1/P2) + description
+5. **Write directive** to {{session_dir}}/council-directive.md with agent-executable fix instructions
+6. **Append** findings to {{session_dir}}/council-summary.md:
+   - Issues found: `## Pass {pass_num}: {category} -- K issues (P0: N, P1: M, P2: O)`
+   - Clean pass: `## Pass {pass_num}: {category} -- clean pass`
+
+### Signal Protocol
+
+- Found issues and wrote directive → end with: [TASK_COMPLETED]
+- Clean pass (no issues) → end with: [THE_CITADEL_APPROVES]
+- Stuck/cannot proceed → end with: [BLOCKED]
+
+### Previous Review Summary
+{prev_summary if prev_summary else '(No previous passes yet)'}
+
+IMPORTANT: Work in {state['working_dir']}. NEVER fix code directly — write directives only.
+"""
+    return prompt
+
+
 def build_prompt(state: dict, session_dir: Path, iteration: int) -> str:
     """Build the full prompt for a hermes iteration (mode-aware)."""
     mode = state.get('mode', 'pickle')
@@ -331,6 +417,10 @@ def build_prompt(state: dict, session_dir: Path, iteration: int) -> str:
     # Meeseeks mode: use single-pass review prompt
     if mode == 'meeseeks':
         return build_meeseeks_prompt(state, session_dir, iteration)
+
+    # Council mode: use single-pass PR stack review prompt
+    if mode == 'council':
+        return build_council_prompt(state, session_dir, iteration)
 
     # Default pickle mode
     handoff = build_handoff(state, session_dir, iteration)
@@ -390,6 +480,10 @@ def run_iteration(session_dir: Path, state: dict, iteration: int,
         pass_num = iteration + 1
         category, _ = get_meeseeks_category(pass_num)
         print(f"  Meeseeks Pass {pass_num} | Category: {category}")
+    elif mode == 'council':
+        pass_num = iteration + 1
+        category, _ = get_council_category(pass_num)
+        print(f"  Council Pass {pass_num} | Category: {category}")
     else:
         print(f"  Iteration {iteration} | Step: {state['step']} | Ticket: {state.get('current_ticket', 'none')}")
     print(f"{'=' * 60}")
@@ -455,6 +549,11 @@ def main():
                 max_iter = 50
             if min_iter == 0:
                 min_iter = 10
+        elif mode == 'council':
+            if max_iter == 100:
+                max_iter = 20
+            if min_iter == 0:
+                min_iter = 5
 
         # Use pickle_state.py to init
         init_cmd = [

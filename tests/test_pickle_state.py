@@ -18,11 +18,11 @@ from pickle_state import (
 
 class TestValidSteps:
     def test_all_steps_present(self):
-        expected = ['prd', 'breakdown', 'research', 'plan', 'implement', 'refactor', 'review', 'meeseeks']
+        expected = ['prd', 'breakdown', 'research', 'plan', 'implement', 'refactor', 'review', 'meeseeks', 'council']
         assert VALID_STEPS == expected
 
     def test_step_count(self):
-        assert len(VALID_STEPS) == 8
+        assert len(VALID_STEPS) == 9
 
 
 class TestDefaultState:

@@ -1,14 +1,14 @@
 ---
 name: pickle-rick-council
-description: "Council of Ricks PR stack review: iterative review of git branch stacks (Graphite/stacked PRs). Generates agent-executable directives for fixing issues. Never fixes code directly."
-version: 0.1.0
+description: "Council of Ricks PR stack review: iterative review of git branch stacks via mux_runner with clean context per pass. Generates agent-executable directives for fixing issues. Never fixes code directly."
+version: 0.2.0
 author: Gal Zahavi (original), Gregory Dickson (Hermes port)
 license: Apache-2.0
 metadata:
   hermes:
     tags: [autonomous, code-review, PR, stack, graphite, council]
     homepage: https://github.com/ATheorical/pickle-rick-claude
-    related_skills: [pickle-rick, pickle-rick-meeseeks]
+    related_skills: [pickle-rick, pickle-rick-meeseeks, pickle-rick-tmux]
 ---
 
 # Council of Ricks — PR Stack Review
@@ -22,6 +22,43 @@ directly — judges and documents only.**
 - User says "council of ricks", "stack review", "review my PR stack"
 - User has stacked branches (Graphite, git-branchless, or manual stacking)
 - User wants a systematic multi-pass review of a PR stack
+
+## Orchestrated Mode (Recommended)
+
+Each review pass runs in clean context (`hermes -q` per pass) via the
+mux_runner, preventing context bloat over 20 passes.
+
+### Quick Launch
+
+```bash
+# Direct launch
+python3 ~/.hermes/skills/autonomous-ai-agents/pickle-rick/scripts/mux_runner.py \
+  --task "Review PR stack for the auth refactor" \
+  --working-dir ~/project \
+  --mode council \
+  --min-iterations 5 \
+  --max-iterations 20
+
+# With tmux monitoring
+SCRIPTS=~/.hermes/skills/autonomous-ai-agents/pickle-rick/scripts
+SESSION_DIR=$(python3 $SCRIPTS/pickle_state.py \
+  init --task "Review PR stack" --working-dir ~/project --mode council \
+  | grep SESSION_DIR | cut -d= -f2)
+
+SESSION_NAME="council-$(basename $SESSION_DIR | tail -c 9)"
+tmux new-session -d -s $SESSION_NAME -c ~/project
+tmux send-keys -t $SESSION_NAME:0 "python3 $SCRIPTS/mux_runner.py --resume $SESSION_DIR" Enter
+bash $SCRIPTS/tmux-monitor.sh $SESSION_NAME $SESSION_DIR council
+tmux attach -t $SESSION_NAME
+```
+
+## Signal Protocol
+
+| Token | Meaning | Effect |
+|-------|---------|--------|
+| `[TASK_COMPLETED]` | Issues found, directive written | mux_runner → next pass |
+| `[THE_CITADEL_APPROVES]` | Clean pass (no issues) | mux_runner → check min_iterations, maybe stop |
+| `[BLOCKED]` | Cannot proceed | mux_runner → stop |
 
 ## Prerequisites
 
@@ -150,5 +187,28 @@ terminal(command="python3 ~/.hermes/skills/autonomous-ai-agents/pickle-rick/scri
 
 | Setting | Default | Description |
 |---------|---------|-------------|
-| min_passes | 5 | Minimum passes before accepting clean |
-| max_passes | 20 | Maximum passes before forced stop |
+| min_passes (--min-iterations) | 5 | Minimum passes before accepting clean |
+| max_passes (--max-iterations) | 20 | Maximum passes before forced stop |
+| default_council_min_passes | 5 | pickle_settings.json override for min |
+| default_council_max_passes | 20 | pickle_settings.json override for max |
+
+## Session Artifacts
+
+```
+~/.pickle-rick/sessions/<timestamp>_<hash>/
+  state.json              # mode: "council", step: "council"
+  council-summary.md      # Cumulative review findings
+  council-directive.md    # Agent-executable fix instructions (per pass)
+  iteration_N.log         # Per-pass output log
+  activity.jsonl          # Event log
+  circuit_breaker.json    # Circuit breaker state
+```
+
+## Pitfalls
+
+1. **Never fix code directly** — The Council writes directives, not patches
+2. **Graphite CLI optional** — Falls back to `git branch` if `gt` not installed
+3. **Use orchestrated mode for 5+ passes** — Single-session context bloats fast
+4. **P0 first** — Triage by severity; P2 nitpicks in early passes waste time
+5. **Cross-branch passes need adjacent diffs** — Use `git diff branch1..branch2`
+6. **Check tmux logs** — `tmux attach -t $SESSION_NAME` to monitor live

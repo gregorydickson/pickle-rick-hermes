@@ -28,7 +28,7 @@ from typing import Optional, Dict, Any
 # Constants
 # ---------------------------------------------------------------------------
 
-VALID_STEPS = ['prd', 'breakdown', 'research', 'plan', 'implement', 'refactor', 'review', 'meeseeks']
+VALID_STEPS = ['prd', 'breakdown', 'research', 'plan', 'implement', 'refactor', 'review', 'meeseeks', 'council']
 SESSIONS_ROOT = Path.home() / '.pickle-rick' / 'sessions'
 SCHEMA_VERSION = 1
 
@@ -134,7 +134,7 @@ def cmd_init(args) -> None:
     state.update({
         'working_dir': working_dir,
         'mode': mode,
-        'step': 'meeseeks' if mode == 'meeseeks' else 'prd',
+        'step': mode if mode in ('meeseeks', 'council') else 'prd',
         'start_time_epoch': int(time.time()),
         'original_prompt': args.task or '',
         'started_at': datetime.datetime.now().isoformat(),
