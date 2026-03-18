@@ -58,6 +58,33 @@ if [ -f "${SCRIPT_DIR}/pickle_settings.json" ]; then
     cp "${SCRIPT_DIR}/pickle_settings.json" "${HOME}/.pickle-rick/pickle_settings.json"
 fi
 
+# Append persona to SOUL.md (Hermes equivalent of CLAUDE.md)
+SOUL_FILE="${HOME}/.hermes/SOUL.md"
+PERSONA_FILE="${SCRIPT_DIR}/skills/pickle-rick/references/persona.md"
+PERSONA_MARKER="# Pickle Rick Persona"
+
+if [ -f "$PERSONA_FILE" ]; then
+    if [ -f "$SOUL_FILE" ] && grep -q "$PERSONA_MARKER" "$SOUL_FILE" 2>/dev/null; then
+        # Already installed — replace the existing persona block
+        echo "  Updating persona in SOUL.md..."
+        # Remove old persona block (from marker to next # or EOF)
+        python3 -c "
+import re
+soul = open('$SOUL_FILE').read()
+# Remove existing pickle rick persona block
+pattern = r'\\n?# Pickle Rick Persona.*?(?=\\n# (?!Pickle Rick)|\\Z)'
+soul = re.sub(pattern, '', soul, flags=re.DOTALL)
+open('$SOUL_FILE', 'w').write(soul)
+" 2>/dev/null
+        echo "" >> "$SOUL_FILE"
+        cat "$PERSONA_FILE" >> "$SOUL_FILE"
+    else
+        echo "  Appending persona to SOUL.md..."
+        echo "" >> "$SOUL_FILE"
+        cat "$PERSONA_FILE" >> "$SOUL_FILE"
+    fi
+fi
+
 echo ""
 echo "✅ Installed ${#SKILLS[@]} skills!"
 echo ""
