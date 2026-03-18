@@ -164,14 +164,31 @@ def build_handoff(mv_state: dict, session_dir: Path, iteration: int) -> str:
     return '\n'.join(lines)
 
 
+def load_persona() -> str:
+    """Load the Pickle Rick persona from the skill's references directory."""
+    persona_paths = [
+        SCRIPTS_DIR / '..' / 'references' / 'persona.md',
+        Path.home() / '.hermes' / 'skills' / 'autonomous-ai-agents' / 'pickle-rick' / 'references' / 'persona.md',
+    ]
+    for p in persona_paths:
+        try:
+            return p.resolve().read_text()
+        except OSError:
+            continue
+    return ''
+
+
 def run_worker(session_dir: Path, mv_state: dict, state: dict,
                iteration: int, timeout: int = 1200) -> str:
     """Spawn a hermes -q worker for one microverse iteration."""
     handoff = build_handoff(mv_state, session_dir, iteration)
+    persona = load_persona()
     
     phase = "Gap Analysis" if mv_state['status'] == 'gap_analysis' else "Optimization"
     
     prompt = f"""You are a Microverse Worker running iteration {iteration} ({phase}).
+
+{persona}
 
 Load the pickle-rick-microverse skill: skill_view(name='pickle-rick-microverse')
 

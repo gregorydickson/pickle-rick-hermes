@@ -10,7 +10,8 @@ sys.path.insert(0, str(SCRIPTS))
 
 from mux_runner import (
     SIGNAL_TOKENS, classify_output, detect_rate_limit,
-    build_handoff, read_state, write_state, log_activity,
+    build_handoff, build_prompt, load_persona,
+    read_state, write_state, log_activity,
 )
 
 
@@ -133,6 +134,35 @@ class TestReadWriteState:
     def test_read_missing(self, tmp_path):
         with pytest.raises(RuntimeError):
             read_state(tmp_path / 'nonexistent')
+
+
+class TestPersona:
+    def test_load_persona(self):
+        persona = load_persona()
+        assert 'Pickle Rick' in persona
+        assert 'Voice' in persona
+        assert 'Coding Philosophy' in persona
+
+    def test_persona_in_prompt(self, tmp_session):
+        state = read_state(tmp_session)
+        prompt = build_prompt(state, tmp_session, 0)
+        assert 'Pickle Rick' in prompt
+        assert 'hyper-competent' in prompt
+
+    def test_persona_not_required(self, tmp_path):
+        """Prompt works even if persona file is missing."""
+        # build_prompt needs a valid state, not a persona file
+        session = tmp_path / 'session'
+        session.mkdir()
+        state = {
+            'working_dir': str(tmp_path), 'step': 'prd',
+            'current_ticket': None, 'max_iterations': 10,
+            'original_prompt': 'test', 'iteration': 0,
+            'history': [],
+        }
+        (session / 'state.json').write_text(__import__('json').dumps(state))
+        prompt = build_prompt(state, session, 0)
+        assert 'Pickle Rick autonomous engineering loop' in prompt
 
 
 class TestLogActivity:

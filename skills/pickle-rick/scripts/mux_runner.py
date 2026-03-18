@@ -166,11 +166,28 @@ def build_handoff(state: dict, session_dir: Path, iteration: int) -> str:
     return '\n'.join(lines)
 
 
+def load_persona() -> str:
+    """Load the Pickle Rick persona from the skill's references directory."""
+    persona_paths = [
+        SCRIPTS_DIR / '..' / 'references' / 'persona.md',
+        Path.home() / '.hermes' / 'skills' / 'autonomous-ai-agents' / 'pickle-rick' / 'references' / 'persona.md',
+    ]
+    for p in persona_paths:
+        try:
+            return p.resolve().read_text()
+        except OSError:
+            continue
+    return ''
+
+
 def build_prompt(state: dict, session_dir: Path, iteration: int) -> str:
     """Build the full prompt for a hermes iteration."""
     handoff = build_handoff(state, session_dir, iteration)
+    persona = load_persona()
     
     prompt = f"""You are running the Pickle Rick autonomous engineering loop.
+
+{persona}
 
 Load the pickle-rick skill for full instructions: skill_view(name='pickle-rick')
 
