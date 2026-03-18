@@ -18,6 +18,7 @@ import sys
 import time
 from pathlib import Path
 from datetime import datetime
+from typing import Optional
 
 
 # ANSI styles (Matrix theme from original)
@@ -94,7 +95,7 @@ def collect_tickets(session_dir: Path) -> list:
     return tickets
 
 
-def latest_iteration_log(session_dir: Path) -> Path | None:
+def latest_iteration_log(session_dir: Path) -> 'Optional[Path]':
     """Find the most recent iteration log file."""
     logs = sorted(session_dir.glob('iteration_*.log'), reverse=True)
     if not logs:

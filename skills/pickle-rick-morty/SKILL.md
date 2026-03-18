@@ -27,7 +27,7 @@ ALL phases in sequence. You write code, tests, and verification artifacts.
 - **NEVER** modify state.json or session-level files
 - Write ONLY to your ticket directory
 - Signal completion ONLY with "TICKET COMPLETE"
-- If stuck after 3 attempts, state "BLOCKED: <reason>"
+- If stuck after 3 attempts, state "[BLOCKED]: <reason>"
 
 ## Lifecycle — ONE TICKET, All Phases
 
