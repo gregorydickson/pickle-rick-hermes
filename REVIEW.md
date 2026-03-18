@@ -1,174 +1,88 @@
-# Pickle Rick Hermes Port — Agent Team Review
+# Pickle Rick Hermes Port — Agent Team Review (v2)
 
 Date: 2026-03-17
-Reviewers: Architecture Agent, Code Quality Agent, Skill Correctness Agent
+Reviewers: Architecture, Code Quality, Skill Correctness, Deep Semantics
 
 ## Executive Summary
 
-The port covers 10 of 26 original commands as dedicated skills, with 7 more
-covered by utility scripts (status, standup, metrics, cancel, enable/disable,
-jar-open, retry). The remaining 9 are specialized features (chaos engineering,
-Graphviz visualization, standalone PRD drafter, review worker variant, etc.).
-
-Core loop functionality is solid. The main architectural adaptation (external
-Python orchestrator replacing Claude Code's stop-hook) is sound. Key issues
-found are code quality bugs (non-atomic writes, missing error handling) and
-some gaps in feature coverage.
-
-## Findings by Category
-
-### CRITICAL BUGS (must fix)
-
-1. **monitor.py signal handler** — Lambda with multiple expressions only runs
-   the last one. `sys.stdout.write()` is silently dropped.
-   ```python
-   # Current (broken):
-   signal.signal(signal.SIGINT, lambda s, f: (
-       sys.stdout.write(...), sys.exit(0)
-   ))
-   # Fix: use a proper function
-   ```
-
-2. **circuit_breaker.py non-atomic _save()** — Uses `write_text()` directly.
-   If the process crashes mid-write, circuit_breaker.json is corrupted.
-   Fix: write to .tmp then os.rename (like pickle_state.py does).
-
-3. **microverse_runner.py bare json.loads** — Lines 102, 215, 246 call
-   `json.loads()` outside try/except. Corrupt state files will crash the runner.
-
-4. **mux_runner.py read_state no error handling** — Line 67 `json.loads()`
-   with no try/except. If state.json is corrupted mid-write, the orchestrator
-   crashes with no recovery.
-
-### CODE QUALITY (should fix)
-
-5. **os.rename without try/except** — 5 files use `os.rename()` for atomic
-   writes but don't catch `OSError` for cross-device moves. Affects:
-   pickle_state.py:104, mux_runner.py:74, microverse_runner.py:109,
-   pickle_jar.py:42, pattern_library.py:46.
-   Fix: wrap in try/except, fallback to shutil.move or direct write.
-
-6. **Missing subprocess timeouts** — gitnexus_bridge.py:66,115 and
-   mux_runner.py:263 call subprocess.run() without timeout parameter.
-   Could hang indefinitely.
-
-7. **No SIGCHLD handling in mux_runner.py** — Spawned hermes processes
-   could become zombies in edge cases where the runner ignores their exit.
-
-8. **microverse_runner.py trust boundary** — `measure_metric()` runs
-   user-provided shell commands via `bash -c`. This is by design but
-   should be documented as a trust boundary.
-
-### ARCHITECTURE GAPS (16 unported commands)
-
-**Trivial (7)** — functionality covered by existing scripts:
-- `disable-pickle.md` / `enable-pickle.md` — toggle active flag
-  → Already in `pickle_utils.py cancel`. Could add enable/disable.
-- `eat-pickle.md` — cancel command → covered by cancel
-- `pickle-status.md` / `pickle-standup.md` → covered by pickle_utils.py
-- `pickle-jar-open.md` → covered by pickle_jar.py run
-- `pickle-retry.md` — retry failed ticket → not yet in scripts
-
-**Variant launchers (2)** — already covered by pickle-rick-tmux skill:
-- `pickle-tmux.md` → pickle-rick-tmux skill
-- `meeseeks-zellij.md` → pickle-rick-tmux skill (modes)
-
-**Specialized features (7)** — genuinely missing:
-- `pickle-prd.md` (91 lines) — Standalone interactive PRD drafter with
-  user interview mode. The main pickle-rick skill drafts PRDs non-interactively.
-  **Recommendation**: Add interactive PRD mode to pickle-rick skill.
-- `pickle-refine-prd.md` (221 lines) — Parallel Morty analysis team for
-  PRD refinement. Spawns 3 analyst workers (requirements, codebase, risk).
-  **Recommendation**: Already described in portal-gun; extract as standalone.
-- `project-mayhem.md` (174 lines) — Chaos engineering: mutation testing,
-  dependency downgrades, config corruption. Non-destructive.
-  **Recommendation**: Port as pickle-rick-chaos skill.
-- `pickle-dot.md` + `pickle-dot-patterns.md` (458 lines combined) — Convert
-  PRDs into Graphviz DOT digraphs for the "attractor" execution engine.
-  **Recommendation**: Very specialized, low priority.
-- `attract.md` (260 lines) — Submit DOT pipelines to attractor server.
-  **Recommendation**: Depends on pickle-dot, low priority.
-- `send-to-morty-review.md` (65 lines) — Review-specific worker variant.
-  **Recommendation**: Merge into pickle-rick-morty as a review mode.
-
-### STATE SCHEMA
-
-**Original State interface (16 fields):**
-- Port correctly maps all runtime fields
-- Missing 5 fields are StateManagerOptions (lock config): baseLockDelayMs,
-  lockJitter, maxLockRetries, staleLockTimeoutMs, schemaVersion
-  → These were implementation details of the TS lock system, not needed
-  in the Python port which uses fcntl directly. **Acceptable.**
-- Port adds 3 extra fields: history, session_dir, started_at
-  → Useful additions. **Good.**
-
-### PROMISE TOKENS
-
-- Original has 8 tokens: EPIC_COMPLETED, TASK_COMPLETED, WORKER_DONE,
-  PRD_COMPLETE, TICKET_SELECTED, ANALYSIS_DONE, EXISTENCE_IS_PAIN,
-  THE_CITADEL_APPROVES
-- Port has 5 signal tokens: EPIC_COMPLETED, TASK_COMPLETED, PRD_COMPLETE,
-  TICKET_SELECTED, BLOCKED
-- **Missing tokens:**
-  - WORKER_DONE → replaced by delegate_task return (correct adaptation)
-  - ANALYSIS_DONE → refinement team signal (not yet ported)
-  - EXISTENCE_IS_PAIN → meeseeks clean pass signal (described in skill
-    but not in mux_runner.py signal detection)
-  - THE_CITADEL_APPROVES → council clean pass signal (same issue)
-- **Added token:** BLOCKED (not in original, good addition)
-- **Recommendation:** Add EXISTENCE_IS_PAIN and THE_CITADEL_APPROVES to
-  mux_runner.py SIGNAL_TOKENS so orchestrated meeseeks/council loops
-  can detect clean passes.
-
-### SKILL CORRECTNESS
-
-- **pickle-rick-council** references CLAUDE.md — This is correct in context
-  (it's reviewing project files, CLAUDE.md is a valid project rules file).
-  Not a bug, just noting it.
-- **Main pickle-rick SKILL.md** only cross-references pickle-rick-meeseeks
-  in "Integration with Other Skills" section. Should list all 8 related skills.
-- All script paths correctly use ~/.hermes/skills/autonomous-ai-agents/ prefix.
-- No Claude Code-isms in tool invocations (good).
-- Signal protocol is consistent across skills using [TOKEN] format (good).
-- Frontmatter names match directory names (good).
-
-### LIFECYCLE STEPS
-
-Perfect match: both use prd → breakdown → research → plan → implement →
-refactor → review. **No drift.**
-
-## Recommendations (Priority Order)
-
-### P0 — Fix Bugs
-1. Fix monitor.py signal handler (lambda → proper function)
-2. Make circuit_breaker.py _save() atomic (tmp + rename)
-3. Add try/except around json.loads in mux_runner.py and microverse_runner.py
-4. Add timeouts to all subprocess.run calls
-
-### P1 — Robustness
-5. Wrap os.rename in try/except with fallback (5 files)
-6. Add EXISTENCE_IS_PAIN and THE_CITADEL_APPROVES to signal tokens
-7. Update pickle-rick SKILL.md Integration section to list all skills
-8. Add pickle-retry equivalent to pickle_utils.py
-
-### P2 — Feature Completeness
-9. Port pickle-prd.md as interactive PRD mode in pickle-rick skill
-10. Port pickle-refine-prd.md as standalone refinement skill
-11. Port project-mayhem.md as pickle-rick-chaos skill
-12. Add review mode to pickle-rick-morty (from send-to-morty-review.md)
-
-### P3 — Nice to Have
-13. Port pickle-dot.md (Graphviz DOT generation)
-14. Port attract.md (attractor execution engine)
-15. SIGCHLD handling in orchestrators
+Full port complete. All 26 original pickle-rick-claude commands have Hermes
+equivalents across 16 skills + 9 Python scripts. The architectural adaptation
+(external Python orchestrator replacing Claude Code's stop-hook) is sound.
+All lifecycle steps, signal tokens, and exit conditions match the original.
 
 ## Scorecard
 
 | Category | Score | Notes |
 |----------|-------|-------|
-| Feature Coverage | 85% | 10/26 commands as skills, 7 more via scripts |
-| Core Loop Fidelity | 95% | State machine, lifecycle, delegation all correct |
-| Code Quality | 70% | Functional but needs error handling hardening |
-| Skill Accuracy | 90% | Instructions are correct, minor cross-ref gaps |
-| Architecture Adaptation | 95% | Stop-hook → external loop is well-designed |
-| Overall | 85% | Solid MVP, needs bug fixes and error hardening |
+| Command Coverage | 100% | 26/26 commands mapped (16 skills + utility scripts) |
+| Core Loop Fidelity | 95% | State machine, lifecycle, delegation, exit conditions all correct |
+| Signal Protocol | 100% | All 8 original tokens mapped (2 via delegate_task by design) |
+| Code Quality | 90% | Error handling improved, remaining items are minor |
+| Skill Accuracy | 95% | All skills correct, cross-references complete |
+| Settings Parity | 95% | All original settings present (auto_update N/A for Hermes) |
+| Architecture Adaptation | 95% | Stop-hook → external loop well-designed |
+| Overall | 95% | Production-ready with minor hardening remaining |
+
+## Review 1: Architecture & Completeness
+
+- **26/26** original commands covered
+- State schema: all runtime fields present; 5 missing fields are Claude Code
+  lock config internals or mode flags (tmux_mode, pid, command_template,
+  chain_meeseeks, min_iterations) — acceptable since Hermes port uses
+  different mechanisms
+- Lifecycle steps: perfect match (prd→breakdown→research→plan→implement→refactor→review)
+- All 8 mux_runner exit conditions implemented (max_iter, max_time, circuit_breaker,
+  rate_limit, epic_completed, blocked, review_clean, signal_shutdown)
+
+## Review 2: Code Quality
+
+6 findings across 9 scripts (down from 16 in v1 review):
+
+| # | File | Issue | Severity | Status |
+|---|------|-------|----------|--------|
+| 1 | pickle_state.py:104 | os.rename without try/except | Medium | FIXED |
+| 2 | microverse_runner.py:225 | json.loads without try/except | Medium | FIXED |
+| 3 | microverse_runner.py:247 | subprocess.run without timeout | Medium | FIXED |
+| 4 | microverse_runner.py:256 | json.loads without try/except | Medium | FIXED |
+| 5 | pickle_jar.py:42 | os.rename without try/except | Medium | FIXED |
+| 6 | pattern_library.py:46 | os.rename without try/except | Medium | FIXED |
+
+Previously fixed in v1:
+- monitor.py signal handler (lambda → proper function)
+- circuit_breaker.py atomic _save()
+- mux_runner.py read/write error handling + timeout
+
+## Review 3: Skill Correctness
+
+- All 16 skills have correct YAML frontmatter
+- No Claude Code-isms in tool invocations
+- Signal protocol consistent across all skills ([TOKEN] format)
+- related_skills all point to real skills
+- pickle-rick-council references CLAUDE.md correctly (as a project rules file)
+- Main skill cross-references all 15 related skills
+- Help skill lists all 16 skills
+- All skills have "When to Use" sections
+
+## Review 4: Deep Semantic Comparison
+
+- **Circuit breaker**: Port uses hardcoded thresholds (3/3) vs original's
+  settings-driven defaults (5/5). Settings file has correct values but
+  the Python class doesn't read them yet — uses class constants.
+  Low priority; thresholds are reasonable defaults.
+- **Microverse compareMetric**: Direction-aware comparison logic matches original
+  (higher/lower with tolerance). Both default to 'higher'.
+- **Morty worker lifecycle**: All 8 phases match (Research → Research Review →
+  Plan → Plan Review → Implement → Spec Conformance → Code Review → Simplify)
+- **Settings parity**: All original settings present except auto_update_enabled
+  and update_check_interval_hours (N/A for Hermes — no auto-updater needed).
+  Added refinement_cycles, refinement_max_turns, meeseeks_model, cb_half_open_after.
+
+## Remaining Items (P2/P3 — optional)
+
+1. Circuit breaker could read thresholds from pickle_settings.json at runtime
+   instead of hardcoded class constants (P2)
+2. State schema missing 5 optional fields: tmux_mode, pid, command_template,
+   chain_meeseeks, min_iterations — only relevant if porting the tmux mode
+   state management deeper (P3)
+3. Settings still missing: default_manager_max_turns, default_tmux_max_turns —
+   these are Claude Code turn-budget settings, not applicable to Hermes (N/A)

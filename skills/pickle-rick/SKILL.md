@@ -246,16 +246,21 @@ Load the full persona from references/persona.md.
 
 ## Integration with Other Skills
 
+- **pickle-rick-prd**: Interactive PRD drafter with user interview
+- **pickle-rick-refine-prd**: 3 parallel analyst refinement + ticket decomposition
 - **pickle-rick-meeseeks**: Chain after implementation for iterative code review
 - **pickle-rick-microverse**: Use for metric-driven convergence optimization
-- **pickle-rick-portal-gun**: Transplant patterns from donor repos, generates PRDs for pickle-rick
+- **pickle-rick-portal-gun**: Transplant patterns from donor repos, generates PRDs
 - **pickle-rick-council**: Review stacked PRs with agent-executable directives
 - **pickle-rick-jar**: Queue multiple tasks for sequential batch execution
-- **pickle-rick-morty**: Worker lifecycle instructions (loaded by delegate_task workers)
+- **pickle-rick-morty**: Worker lifecycle (loaded by delegate_task workers)
+- **pickle-rick-morty-review**: Cross-ticket spec conformance review worker
 - **pickle-rick-tmux**: Launch sessions in tmux/Zellij with live monitor dashboard
+- **pickle-rick-chaos**: Project Mayhem chaos engineering (mutation/deps/config)
+- **pickle-rick-dot**: Convert PRDs to attractor-compatible DOT graphs
+- **pickle-rick-dot-patterns**: DOT convergence pattern reference
+- **pickle-rick-attract**: Submit DOT pipelines to attractor server
 - **pickle-rick-help**: List all available commands and utilities
-- **subagent-driven-development**: Similar pattern, pickle-rick adds PRD and state management
-- **writing-plans**: Can generate the initial plan/PRD
 
 ## Pitfalls
 

@@ -101,7 +101,11 @@ def locked_update(state_path: Path, updates: Dict[str, Any]) -> Dict[str, Any]:
             state.update(updates)
             tmp_path = state_path.with_suffix(f'.tmp.{os.getpid()}')
             tmp_path.write_text(json.dumps(state, indent=2))
-            os.rename(str(tmp_path), str(state_path))
+            try:
+                os.rename(str(tmp_path), str(state_path))
+            except OSError:
+                tmp_path.unlink(missing_ok=True)
+                state_path.write_text(json.dumps(state, indent=2))
             return state
         finally:
             fcntl.flock(lock_f.fileno(), fcntl.LOCK_UN)

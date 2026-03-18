@@ -39,7 +39,11 @@ def save_manifest(manifest: dict) -> None:
     JAR_ROOT.mkdir(parents=True, exist_ok=True)
     tmp = MANIFEST_PATH.with_suffix('.tmp')
     tmp.write_text(json.dumps(manifest, indent=2))
-    os.rename(str(tmp), str(MANIFEST_PATH))
+    try:
+        os.rename(str(tmp), str(MANIFEST_PATH))
+    except OSError:
+        tmp.unlink(missing_ok=True)
+        MANIFEST_PATH.write_text(json.dumps(manifest, indent=2))
 
 
 def cmd_add(args):

@@ -43,7 +43,11 @@ def save_index(index: dict) -> None:
     PATTERNS_ROOT.mkdir(parents=True, exist_ok=True)
     tmp = INDEX_PATH.with_suffix('.tmp')
     tmp.write_text(json.dumps(index, indent=2))
-    os.rename(str(tmp), str(INDEX_PATH))
+    try:
+        os.rename(str(tmp), str(INDEX_PATH))
+    except OSError:
+        tmp.unlink(missing_ok=True)
+        INDEX_PATH.write_text(json.dumps(index, indent=2))
     
     # Also write a human-readable index.md
     md_path = PATTERNS_ROOT / 'index.md'

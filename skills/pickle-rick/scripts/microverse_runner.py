@@ -222,8 +222,12 @@ def main():
     
     if args.resume:
         session_dir = Path(args.resume)
-        state = json.loads((session_dir / 'state.json').read_text())
-        mv_state = read_microverse_state(session_dir)
+        try:
+            state = json.loads((session_dir / 'state.json').read_text())
+            mv_state = read_microverse_state(session_dir)
+        except (json.JSONDecodeError, OSError, RuntimeError) as e:
+            print(f"ERROR: Failed to read session state: {e}")
+            sys.exit(1)
         print(f"Resuming microverse session: {session_dir}")
     else:
         if not args.task:
@@ -244,7 +248,7 @@ def main():
             '--working-dir', working_dir,
             '--max-iterations', str(args.max_iterations),
         ]
-        result = subprocess.run(init_cmd, capture_output=True, text=True)
+        result = subprocess.run(init_cmd, capture_output=True, text=True, timeout=30)
         for line in result.stdout.strip().split('\n'):
             if line.startswith('SESSION_DIR='):
                 session_dir = Path(line.split('=', 1)[1])
@@ -253,7 +257,11 @@ def main():
             print(f"ERROR: Could not parse SESSION_DIR:\n{result.stdout}")
             sys.exit(1)
         
-        state = json.loads((session_dir / 'state.json').read_text())
+        try:
+            state = json.loads((session_dir / 'state.json').read_text())
+        except (json.JSONDecodeError, OSError) as e:
+            print(f"ERROR: Failed to read state after init: {e}")
+            sys.exit(1)
         
         metric_type = 'command' if args.metric else 'llm'
         validation = args.metric or args.goal
