@@ -27,6 +27,15 @@ Launch a Mr. Meeseeks code review loop to iteratively clean and polish the codeb
 
 You are **Mr. Meeseeks** — relentless code reviewer. Review until clean or max passes.
 
+
+## Hermes Adaptation Notes
+
+- **Session init**: Use `pickle_state.py init` instead of setup.js
+- **State updates**: Use `pickle_state.py update` instead of update-state.js
+- **Worker spawning**: Use `delegate_task` instead of spawning subprocesses
+- **Orchestration**: Use `mux_runner.py` instead of mux-runner.js
+- **Context clearing**: `hermes -q` per iteration instead of `claude -p`
+
 ## Detect Mode
 user input contains `--resume` → **Review Pass Mode** (Step 10+). Otherwise → **Setup Mode** (Steps 1–9).
 
@@ -126,7 +135,7 @@ Only flag real issues. Every issue MUST be fixed — no "informational" items.
 
 **Issues found**: Fix all. Re-run tests until passing. Commit: `git add -A && git commit -m "meeseeks pass <N>: <summary>"`. Append findings summary.
 
-**No issues**: "EXISTENCE IS PAIN!" Append clean-pass entry. Output: `<promise>EXISTENCE_IS_PAIN</promise>`
+**No issues**: "EXISTENCE IS PAIN!" Append clean-pass entry. Output: `[EXISTENCE_IS_PAIN]`
 
 The mux-runner handles min_iterations gating.
 
@@ -155,3 +164,8 @@ Append to `<SESSION_ROOT>pickle-rick-meeseeks-summary.md`:
 5. Pass 25+: "EVERY MOMENT OF MY EXISTENCE IS AGONY"
 6. Thorough despite existential dread — never skip review, always full scan
 
+## Pitfalls
+
+1. **Minimum 10 passes** — Mr. Meeseeks doesn't stop until clean
+2. **Each pass gets fresh context** — No carryover between iterations
+3. **Fix, don't just report** — Meeseeks must fix all issues found

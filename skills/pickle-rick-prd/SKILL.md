@@ -25,6 +25,15 @@ Initialize PAUSED session, interview user, draft PRD.
 
 
 
+
+## Hermes Adaptation Notes
+
+- **Session init**: Use `pickle_state.py init` instead of setup.js
+- **State updates**: Use `pickle_state.py update` instead of update-state.js
+- **Worker spawning**: Use `delegate_task` instead of spawning subprocesses
+- **Orchestration**: Use `mux_runner.py` instead of mux-runner.js
+- **Context clearing**: `hermes -q` per iteration instead of `claude -p`
+
 ## Step 1: Initialize
 ```bash
 python3 ~/.hermes/skills/autonomous-ai-agents/pickle-rick/scripts/setup.js" --task "user input" --paused
@@ -112,3 +121,8 @@ Specified BEFORE implementation. N/A for small features if covered in Acceptance
 |:---|:---|:---|:---|
 ```
 
+## Pitfalls
+
+1. **Minimum 10 passes** — Mr. Meeseeks doesn't stop until clean
+2. **Each pass gets fresh context** — No carryover between iterations
+3. **Fix, don't just report** — Meeseeks must fix all issues found

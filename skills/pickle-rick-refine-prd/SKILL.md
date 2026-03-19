@@ -34,15 +34,15 @@ Refine and decompose PRD into atomic tickets using parallel Morty analysis team.
 ## Step 0: Parse Flags
 `--run` → AUTO_RUN. `--meeseeks` → CHAIN_MEESEEKS (implies --run). `--resume [PATH]` → RESUME_MODE (reuse existing session). Remainder = `${TASK_ARGS}`.
 
-If `--resume` has a path argument → `RESUME_SESSION = <path>`. If `--resume` with no path → resolve via `node "$HOME/.claude/pickle-rick/extension/bin/get-session.js"` → `RESUME_SESSION`.
+If `--resume` has a path argument → `RESUME_SESSION = <path>`. If `--resume` with no path → resolve via `node "~/.hermes/skills/autonomous-ai-agents/pickle-rick/scripts/get-session.js"` → `RESUME_SESSION`.
 
 ## Step 1: Locate PRD
 
-**If RESUME_MODE**: PRD is at `${RESUME_SESSION}/prd.md`. If missing → "Session has no prd.md. Run `/pickle-prd` first." Stop. Set `SESSION_ROOT = ${RESUME_SESSION}`.
+**If RESUME_MODE**: PRD is at `${RESUME_SESSION}/prd.md`. If missing → "Session has no prd.md. Run `pickle-rick-prd` first." Stop. Set `SESSION_ROOT = ${RESUME_SESSION}`.
 
-**If NOT RESUME_MODE**: Priority: 1) explicit path in `${TASK_ARGS}`, 2) `prd.md`/`PRD.md` in cwd, 3) `node "$HOME/.claude/pickle-rick/extension/bin/get-session.js"` → session's `prd.md`.
+**If NOT RESUME_MODE**: Priority: 1) explicit path in `${TASK_ARGS}`, 2) `prd.md`/`PRD.md` in cwd, 3) `node "~/.hermes/skills/autonomous-ai-agents/pickle-rick/scripts/get-session.js"` → session's `prd.md`.
 
-Not found → "Run `/pickle-prd` first or pass path." Stop.
+Not found → "Run `pickle-rick-prd` first or pass path." Stop.
 
 ## Step 1b: Org Context
 
@@ -81,7 +81,7 @@ Iterate until PASS. Update PRD in place. Continue to Step 3.
 
 ## Step 3: Initialize Session
 
-Extension root: `$HOME/.claude/pickle-rick` (`~/.hermes/skills/autonomous-ai-agents/pickle-rick`).
+Extension root: `~/.hermes/skills/autonomous-ai-agents/pickle-rick`.
 
 **If RESUME_MODE**: `SESSION_ROOT` is already set from Step 1. `<PRD_PATH> = ${SESSION_ROOT}/prd.md`. Skip session creation — reuse existing session directory and state.
 
@@ -98,7 +98,7 @@ Extract `SESSION_ROOT`. Save original path as `<PRD_PATH>`. `cp "<PRD_PATH>" "${
 REFINE_HASH="$(basename "${SESSION_ROOT}" | sed 's/.*\(.\{8\}\)$/\1/')"
 REFINE_SESSION="refine-${REFINE_HASH}"
 tmux new-session -d -s "$REFINE_SESSION" -c "$(pwd)"
-tmux send-keys -t "$REFINE_SESSION" "node ~/.hermes/skills/autonomous-ai-agents/pickle-rick/extension/bin/refinement-watcher.js ${SESSION_ROOT}" Enter
+tmux send-keys -t "$REFINE_SESSION" "python3 ~/.hermes/skills/autonomous-ai-agents/pickle-rick/scripts/bin/refinement-watcher.js ${SESSION_ROOT}" Enter
 ```
 No tmux → skip to 4b.
 
@@ -227,7 +227,7 @@ python3 ~/.hermes/skills/autonomous-ai-agents/pickle-rick/scripts/pickle_state.p
 CHAIN_MEESEEKS → append `--chain-meeseeks`.
 
 ### 11b-zellij: Re-initialize (Zellij)
-Same setup command. Then create Zellij session per /pickle-zellij Steps 3-4.
+Same setup command. Then create Zellij session per pickle-rick-zellij Steps 3-4.
 
 ### 11c: tmux Session
 ```bash
@@ -237,7 +237,7 @@ sleep 1
 
 ### 11d: Launch Runner
 ```bash
-tmux send-keys -t <name>:0 "node $HOME/.claude/pickle-rick/extension/bin/mux-runner.js ${SESSION_ROOT}; echo 'Runner finished.'; read" Enter
+tmux send-keys -t <name>:0 "python3 ~/.hermes/skills/autonomous-ai-agents/pickle-rick/scripts/mux_runner.js ${SESSION_ROOT}; echo 'Runner finished.'; read" Enter
 ```
 
 ### 11e: Monitor

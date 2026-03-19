@@ -195,3 +195,8 @@ If any fail: `git checkout .`, restore deps if needed, re-run tests, warn user.
 6. **ALWAYS** confirm with user: ecosystem detection (Step 1), config file list (Step 5a), baseline test failure (Step 2).
 7. On any error: `git checkout .` + restore deps before reporting.
 
+## Pitfalls
+
+1. **Non-destructive by design** — All mutations are reverted
+2. **Git stash before chaos** — Save uncommitted work first
+3. **Chaos score is relative** — Compare across runs, not absolute

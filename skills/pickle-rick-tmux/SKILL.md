@@ -24,6 +24,15 @@ Launch a Pickle Rick epic in tmux with true context clearing between iterations 
 
 # pickle-rick-tmux
 
+
+## Hermes Adaptation Notes
+
+- **Session init**: Use `pickle_state.py init` instead of setup.js
+- **State updates**: Use `pickle_state.py update` instead of update-state.js
+- **Worker spawning**: Use `delegate_task` instead of spawning subprocesses
+- **Orchestration**: Use `mux_runner.py` instead of mux-runner.js
+- **Context clearing**: `hermes -q` per iteration instead of `claude -p`
+
 ## Step 1: Check tmux
 Run `tmux -V`. If missing: "Install tmux: `brew install tmux` or `apt install tmux`, or use pickle-rick for interactive mode." Stop.
 
@@ -33,9 +42,9 @@ Extract flags from user input (`--resume <path>`, `--max-iterations <N>`, etc.).
 ```bash
 python3 ~/.hermes/skills/autonomous-ai-agents/pickle-rick/scripts/setup.js" --tmux <FLAGS> --task "<TASK_TEXT>"
 ```
-No flags: `setup.js --tmux --task "user input"`.
-Resume example: `setup.js --tmux --resume /sessions/057f0263` (no --task needed).
-Flags+task example: `setup.js --tmux --max-iterations 10 --task "refactor auth"`
+No flags: `pickle_state.py init --tmux --task "user input"`.
+Resume example: `pickle_state.py init --tmux --resume /sessions/057f0263` (no --task needed).
+Flags+task example: `pickle_state.py init --tmux --max-iterations 10 --task "refactor auth"`
 
 Extract `SESSION_ROOT=<path>` and `working_dir` from output.
 
@@ -62,3 +71,8 @@ Print: session name, `tmux attach -t <name>`, window layout (monitor: dashboard 
 
 Output: `[TASK_COMPLETED]`
 
+## Pitfalls
+
+1. **Multiplexer must be installed** — Check version before launching
+2. **Session names must be unique** — Hash-based naming prevents conflicts
+3. **Monitor panes are read-only** — Don't interact with monitor windows

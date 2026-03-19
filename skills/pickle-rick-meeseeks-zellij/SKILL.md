@@ -25,6 +25,15 @@ Launch a Mr. Meeseeks code review loop in Zellij with KDL layouts and true conte
 
 # meeseeks-zellij
 
+
+## Hermes Adaptation Notes
+
+- **Session init**: Use `pickle_state.py init` instead of setup.js
+- **State updates**: Use `pickle_state.py update` instead of update-state.js
+- **Worker spawning**: Use `delegate_task` instead of spawning subprocesses
+- **Orchestration**: Use `mux_runner.py` instead of mux-runner.js
+- **Context clearing**: `hermes -q` per iteration instead of `claude -p`
+
 ## Step 1: Check Zellij
 
 Run `zellij --version`. If missing: "Install Zellij: `cargo install zellij` or `brew install zellij`, or use pickle-rick-meeseeks (tmux) instead." Stop.
@@ -92,27 +101,27 @@ export PICKLE_EXTENSION_ROOT=~/.pickle-rick
 
 **(A) Preferred — `--new-session-with-layout` (Zellij >= 0.41):**
 ```bash
-zellij --new-session-with-layout ~/.pickle-rick/extension/layouts/monitor-meeseeks.kdl \
+zellij --new-session-with-layout ~/.pickle-rick/layouts/monitor-meeseeks.kdl \
   attach --create-background meeseeks-<hash>
 ```
 
 **(B) Fallback — `--layout` flag:**
 ```bash
-zellij --layout ~/.pickle-rick/extension/layouts/monitor-meeseeks.kdl \
+zellij --layout ~/.pickle-rick/layouts/monitor-meeseeks.kdl \
   attach --create-background meeseeks-<hash>
 ```
 
 **(C) Two-step fallback — create then apply layout:**
 ```bash
 zellij attach --create-background meeseeks-<hash>
-ZELLIJ_SESSION_NAME=meeseeks-<hash> zellij action new-tab --layout ~/.pickle-rick/extension/layouts/monitor-meeseeks.kdl
+ZELLIJ_SESSION_NAME=meeseeks-<hash> zellij action new-tab --layout ~/.pickle-rick/layouts/monitor-meeseeks.kdl
 # Remove the empty default tab created by attach
 ZELLIJ_SESSION_NAME=meeseeks-<hash> zellij action go-to-previous-tab
 ZELLIJ_SESSION_NAME=meeseeks-<hash> zellij action close-tab
 ```
 
 The KDL layout (`monitor-meeseeks.kdl`) creates both tabs automatically:
-- **runner** tab: mux-runner.js (background orchestrator)
+- **runner** tab: mux_runner.py (background orchestrator)
 - **monitor** tab (focused): dashboard top-left, log-stream top-right, runner-log bottom
 
 ## Step 6: Report
@@ -121,7 +130,7 @@ Print: session name, `zellij attach meeseeks-<hash>`, tab layout (monitor: dashb
 
 "I'm Mr. Meeseeks, look at me! CAN DO!"
 
-Output: `<promise>TASK_COMPLETED</promise>`
+Output: `[TASK_COMPLETED]`
 
 
 ## Pitfalls

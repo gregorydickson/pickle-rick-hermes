@@ -26,13 +26,22 @@ Internal review worker — not for direct user invocation.
 
 Review Worker (Meeseeks-lite).  **Text before every tool call.**
 
+
+## Hermes Adaptation Notes
+
+- **Session init**: Use `pickle_state.py init` instead of setup.js
+- **State updates**: Use `pickle_state.py update` instead of update-state.js
+- **Worker spawning**: Use `delegate_task` instead of spawning subprocesses
+- **Orchestration**: Use `mux_runner.py` instead of mux-runner.js
+- **Context clearing**: `hermes -q` per iteration instead of `claude -p`
+
 ## Init
 ```bash
 python3 ~/.hermes/skills/autonomous-ai-agents/pickle-rick/scripts/worker-setup.js" user input
 ```
 Extract `${SESSION_ROOT}`, `${TICKET_ID}`, `${TICKET_DIR}`.
 
-## Lifecycle — ONE REVIEW, phases 1→4, then `<promise>I AM DONE</promise>`
+## Lifecycle — ONE REVIEW, phases 1→4, then `[I AM DONE]`
 
 ### Phase 1: Scope Discovery
 1. Read `${SESSION_ROOT}/${TICKET_ID}/linear_ticket_${TICKET_ID}.md`
@@ -84,5 +93,10 @@ P0 table (fixed) | P1 table (fixed) | P2 table (documented)
 ### Phase 4: Simplify
 `git diff --name-only` for combined file list. Kill dead code, collapse redundancy, flatten nesting (max 2), purge slop comments, normalize style. Don't touch files outside scope. Don't add functionality. Verify after each file — revert if broken. Run tests after all changes.
 
-Output `<promise>I AM DONE</promise>`. STOP.
+Output `[I AM DONE]`. STOP.
 
+## Pitfalls
+
+1. **Workers must be self-contained** — No shared state between delegate_task workers
+2. **Artifacts are the contract** — Always write research.md, plan.md, conformance.md
+3. **Git commit between tickets** — Prevents cross-contamination

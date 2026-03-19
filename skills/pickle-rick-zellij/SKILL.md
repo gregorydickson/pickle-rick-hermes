@@ -25,6 +25,15 @@ Launch a Pickle Rick epic in Zellij with KDL layouts and true context clearing b
 
 # pickle-rick-zellij
 
+
+## Hermes Adaptation Notes
+
+- **Session init**: Use `pickle_state.py init` instead of setup.js
+- **State updates**: Use `pickle_state.py update` instead of update-state.js
+- **Worker spawning**: Use `delegate_task` instead of spawning subprocesses
+- **Orchestration**: Use `mux_runner.py` instead of mux-runner.js
+- **Context clearing**: `hermes -q` per iteration instead of `claude -p`
+
 ## Step 1: Check Zellij
 
 Run `zellij --version`. If missing: "Install Zellij: `cargo install zellij` or `brew install zellij`, or use pickle-rick-tmux (tmux) or pickle-rick (interactive mode) instead." Stop.
@@ -54,9 +63,9 @@ Extract flags from user input (`--resume <path>`, `--max-iterations <N>`, etc.).
 ```bash
 python3 ~/.hermes/skills/autonomous-ai-agents/pickle-rick/scripts/setup.js" --tmux <FLAGS> --task "<TASK_TEXT>"
 ```
-No flags: `setup.js --tmux --task "user input"`.
-Resume example: `setup.js --tmux --resume /sessions/057f0263` (no --task needed).
-Flags+task example: `setup.js --tmux --max-iterations 10 --task "refactor auth"`
+No flags: `pickle_state.py init --tmux --task "user input"`.
+Resume example: `pickle_state.py init --tmux --resume /sessions/057f0263` (no --task needed).
+Flags+task example: `pickle_state.py init --tmux --max-iterations 10 --task "refactor auth"`
 
 Extract `SESSION_ROOT=<path>` and `working_dir` from output.
 
@@ -79,33 +88,33 @@ export PICKLE_EXTENSION_ROOT=~/.pickle-rick
 
 **(A) Preferred — `--new-session-with-layout` (Zellij >= 0.41):**
 ```bash
-zellij --new-session-with-layout ~/.pickle-rick/extension/layouts/monitor-pickle.kdl \
+zellij --new-session-with-layout ~/.pickle-rick/layouts/monitor-pickle.kdl \
   attach --create-background pickle-<hash>
 ```
 
 **(B) Fallback — `--layout` flag:**
 ```bash
-zellij --layout ~/.pickle-rick/extension/layouts/monitor-pickle.kdl \
+zellij --layout ~/.pickle-rick/layouts/monitor-pickle.kdl \
   attach --create-background pickle-<hash>
 ```
 
 **(C) Two-step fallback — create then apply layout:**
 ```bash
 zellij attach --create-background pickle-<hash>
-ZELLIJ_SESSION_NAME=pickle-<hash> zellij action new-tab --layout ~/.pickle-rick/extension/layouts/monitor-pickle.kdl
+ZELLIJ_SESSION_NAME=pickle-<hash> zellij action new-tab --layout ~/.pickle-rick/layouts/monitor-pickle.kdl
 # Remove the empty default tab created by attach
 ZELLIJ_SESSION_NAME=pickle-<hash> zellij action go-to-previous-tab
 ZELLIJ_SESSION_NAME=pickle-<hash> zellij action close-tab
 ```
 
 The KDL layout (`monitor-pickle.kdl`) creates both tabs automatically:
-- **runner** tab: mux-runner.js (background orchestrator)
+- **runner** tab: mux_runner.py (background orchestrator)
 - **monitor** tab (focused): dashboard top-left, log-stream top-right, morty-watcher bottom
 
 ## Step 4: Report
 Print: session name, `zellij attach pickle-<hash>`, tab layout (monitor: dashboard top-left / log-stream top-right / morty-logs bottom; runner: switch tabs with Zellij keybinds), cancel: `cd <working_dir> && eat-pickle` (graceful), emergency: `zellij delete-session pickle-<hash>` then `python3 ~/.hermes/skills/autonomous-ai-agents/pickle-rick/scripts/cancel.js`, state path: `<SESSION_ROOT>/state.json`.
 
-Output: `<promise>TASK_COMPLETED</promise>`
+Output: `[TASK_COMPLETED]`
 
 
 ## Pitfalls

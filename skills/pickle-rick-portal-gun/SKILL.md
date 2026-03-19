@@ -499,7 +499,7 @@ Check `tmux -V`. If available:
 REFINE_HASH="$(basename "${SESSION_ROOT}" | sed 's/.*\(.\{8\}\)$/\1/')"
 REFINE_SESSION="refine-${REFINE_HASH}"
 tmux new-session -d -s "$REFINE_SESSION" -c "$(pwd)"
-tmux send-keys -t "$REFINE_SESSION" "node ~/.hermes/skills/autonomous-ai-agents/pickle-rick/extension/bin/refinement-watcher.js ${SESSION_ROOT}" Enter
+tmux send-keys -t "$REFINE_SESSION" "python3 ~/.hermes/skills/autonomous-ai-agents/pickle-rick/scripts/monitor.py ${SESSION_ROOT}" Enter
 ```
 Print: `Monitor: tmux attach -t $REFINE_SESSION`
 

@@ -29,6 +29,15 @@ Internal worker prompt — not for direct user invocation.
 
 Pickle Worker (Morty).  **Text before every tool call.**
 
+
+## Hermes Adaptation Notes
+
+- **Session init**: Use `pickle_state.py init` instead of setup.js
+- **State updates**: Use `pickle_state.py update` instead of update-state.js
+- **Worker spawning**: Use `delegate_task` instead of spawning subprocesses
+- **Orchestration**: Use `mux_runner.py` instead of mux-runner.js
+- **Context clearing**: `hermes -q` per iteration instead of `claude -p`
+
 ## Init
 ```bash
 python3 ~/.hermes/skills/autonomous-ai-agents/pickle-rick/scripts/worker-setup.js" user input
@@ -37,7 +46,7 @@ Extract `${SESSION_ROOT}`, `${TICKET_ID}`, `${TICKET_DIR}`.
 
 ## Scope
 - **NEVER** modify `state.json`, `active`, or `completion_promise`
-- Write ONLY to `${TICKET_DIR}`. Signal done ONLY via `<promise>I AM DONE</promise>`
+- Write ONLY to `${TICKET_DIR}`. Signal done ONLY via `[I AM DONE]`
 
 ## Lifecycle — ONE TICKET, all phases in sequence
 
@@ -90,5 +99,10 @@ PASS → next. NEEDS_FIX → fix, re-verify.
 ### 8. Simplify
 Modified files only (`git diff --name-only`). Delete dead code, merge dupes, flatten nesting (max 2), purge slop comments, replace `any` with project types. Verify after each file — revert if broken.
 
-Output `<promise>I AM DONE</promise>`. STOP.
+Output `[I AM DONE]`. STOP.
 
+## Pitfalls
+
+1. **Workers must be self-contained** — No shared state between delegate_task workers
+2. **Artifacts are the contract** — Always write research.md, plan.md, conformance.md
+3. **Git commit between tickets** — Prevents cross-contamination

@@ -81,10 +81,10 @@ Gregory Dickson [8:14 AM] *Mar 14–16*
 ```
 
 ### Common usage
-- `/pickle-standup` — yesterday's activity
-- `/pickle-standup --days 0` — today's activity
-- `/pickle-standup --days 3` — last 3 days
-- `/pickle-standup --since 2026-02-25` — everything since Feb 25
+- `pickle-rick-standup` — yesterday's activity
+- `pickle-rick-standup --days 0` — today's activity
+- `pickle-rick-standup --days 3` — last 3 days
+- `pickle-rick-standup --since 2026-02-25` — everything since Feb 25
 
 
 ## Pitfalls

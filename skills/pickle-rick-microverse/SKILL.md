@@ -28,6 +28,15 @@ Start the Pickle Rick microverse convergence loop — optimize a metric through 
 
 **SPEAK BEFORE ACTING**: Output text before every tool call.
 
+
+## Hermes Adaptation Notes
+
+- **Session init**: Use `pickle_state.py init` instead of setup.js
+- **State updates**: Use `pickle_state.py update` instead of update-state.js
+- **Worker spawning**: Use `delegate_task` instead of spawning subprocesses
+- **Orchestration**: Use `mux_runner.py` instead of mux-runner.js
+- **Context clearing**: `hermes -q` per iteration instead of `claude -p`
+
 ## Step 1: Parse Flags
 
 Extract from user input:
@@ -57,13 +66,13 @@ Otherwise:
 ```bash
 python3 ~/.hermes/skills/autonomous-ai-agents/pickle-rick/scripts/setup.js" --command-template microverse.md --tmux [--max-iterations <N>] --task "<TASK_TEXT>"
 ```
-If `--interactive` flag was passed, omit `--tmux` from the setup.js call.
+If `--interactive` flag was passed, omit `--tmux` from the init call.
 
 ### Resume
 ```bash
 python3 ~/.hermes/skills/autonomous-ai-agents/pickle-rick/scripts/setup.js" --command-template microverse.md --resume [<PATH>] --tmux [--max-iterations <N>]
 ```
-If `--interactive` flag was passed, omit `--tmux` from the setup.js call.
+If `--interactive` flag was passed, omit `--tmux` from the init call.
 
 Extract `SESSION_ROOT=<path>` from output. If `--resume`, skip Steps 3 and 4.
 
@@ -229,3 +238,8 @@ Repeat until converged or max iterations reached:
 5. **Use built-in tools** — Glob for file search, Grep for content search, Read for files
 6. **microverse.json is the source of truth** — update it after every state change
 
+## Pitfalls
+
+1. **Minimum 10 passes** — Mr. Meeseeks doesn't stop until clean
+2. **Each pass gets fresh context** — No carryover between iterations
+3. **Fix, don't just report** — Meeseeks must fix all issues found

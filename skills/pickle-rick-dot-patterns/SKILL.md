@@ -278,3 +278,8 @@ Permission modes: `plan` (default), `bypassPermissions`, `acceptEdits`, `auto`, 
 
 Full schema: `attractor/DOT_SCHEMA.md`. Key tool attribute: `context_on_success` (sets RunContext keys on exit 0).
 
+## Pitfalls
+
+1. **Minimum 10 passes** — Mr. Meeseeks doesn't stop until clean
+2. **Each pass gets fresh context** — No carryover between iterations
+3. **Fix, don't just report** — Meeseeks must fix all issues found
