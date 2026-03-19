@@ -1,24 +1,17 @@
 ---
 name: pickle-rick-microverse
-description: "Convergence optimization loop: optimize a metric through targeted, incremental changes. Each iteration spawns a fresh hermes -q, measures the metric between spawns, accepts improvements, auto-reverts regressions. Supports command-based and LLM-judged metrics."
-version: 0.2.0
+description: "Convergence optimization loop: optimize a metric through targeted, incremental changes. Supports command-based and LLM-judged metrics, tmux/interactive modes, direction awareness."
+version: 0.3.0
 author: Gal Zahavi (original), Gregory Dickson (Hermes port)
 license: Apache-2.0
 metadata:
   hermes:
-    tags: [autonomous, optimization, convergence, metrics, microverse]
+    tags: ['autonomous', 'convergence', 'optimization', 'metrics', 'microverse']
     homepage: https://github.com/gregorydickson/pickle-rick-hermes
-    related_skills: [pickle-rick, pickle-rick-meeseeks, pickle-rick-tmux]
+    related_skills: ['pickle-rick', 'pickle-rick-dot', 'pickle-rick-tmux']
 ---
 
-# Microverse — Convergence Optimization Loop
-
-> *"I put a universe inside a box, Morty, and it powers my car battery."*
-
-Optimize a numeric metric through targeted, incremental changes. Each iteration
-spawns a fresh `hermes -q` with clean context, then the orchestrator measures
-the metric, compares scores, and auto-reverts regressions. Converges when no
-improvement is found for N consecutive iterations.
+# Pickle Rick — Microverse
 
 ## When to Use
 
@@ -26,225 +19,213 @@ improvement is found for N consecutive iterations.
 - User says "microverse", "optimize", "converge", or "improve this metric"
 - User provides a metric command and a task description
 
-## Architecture
 
-Unlike meeseeks (which uses mux_runner.py), microverse has its **own dedicated
-orchestrator** — `microverse_runner.py`. This is because the orchestrator must
-measure metrics and do git reverts BETWEEN spawned hermes processes, which
-doesn't fit the generic signal-based mux_runner pattern.
+Start the Pickle Rick microverse convergence loop — optimize a metric through targeted, incremental changes. Defaults to tmux mode; use --interactive for inline.
 
+# pickle-rick-microverse
+
+ Proceed to Step 1.
+
+**SPEAK BEFORE ACTING**: Output text before every tool call.
+
+## Step 1: Parse Flags
+
+Extract from user input:
+
+| Flag | Default | Required (new) | Description |
+|------|---------|----------------|-------------|
+| `--metric "<cmd>"` | — | Yes (XOR --goal) | Shell command whose last stdout line is a numeric score. Sets type='command'. |
+| `--goal "<text>"` | — | Yes (XOR --metric) | Natural language goal for LLM judge. Sets type='llm'. |
+| `--direction <higher\|lower>` | `higher` | No | Optimization direction — whether higher or lower scores are better |
+| `--judge-model <model>` | `claude-sonnet-4-6` | No | Judge model for LLM scoring (only valid with --goal) |
+| `--task "<text>"` | — | Yes | What to optimize (becomes the PRD objective) |
+| `--tolerance <N>` | `0` | No | Score delta within which changes count as "held" |
+| `--stall-limit <N>` | `5` | No | Non-improving iterations before convergence |
+| `--max-iterations <N>` | `500` | No | Hard cap on total iterations |
+| `--resume [path]` | — | No | Resume existing session (skips --metric/--task/--goal) |
+| `--interactive` | — | No | Run inline instead of tmux (default is tmux mode) |
+
+If `--resume`: `--metric`/`--goal` and `--task` are NOT required.
+Otherwise:
+- Exactly one of `--metric` or `--goal` is required — print error and STOP if both or neither provided.
+- `--task` is required — print error and STOP if missing.
+- `--judge-model` without `--goal` is an error — print error and STOP.
+
+## Step 2: Session Setup
+
+### New Session
+```bash
+python3 ~/.hermes/skills/autonomous-ai-agents/pickle-rick/scripts/setup.js" --command-template microverse.md --tmux [--max-iterations <N>] --task "<TASK_TEXT>"
 ```
-┌──────────────────────────────────────┐
-│  microverse_runner.py (orchestrator) │  Python loop
-│  - Measures metric between iterations│
-│  - Compares scores (direction-aware) │
-│  - Auto-reverts regressions via git  │
-│  - Tracks failed approaches          │
-│  - Manages stall counter / convergence│
-└──────────────┬───────────────────────┘
-               │ spawns per iteration
-┌──────────────▼───────────────────────┐
-│  hermes -q (worker)                  │  Fresh context each time
-│  - Reads microverse.json handoff     │
-│  - Makes ONE targeted change         │
-│  - Commits                           │
-│  - Signals [TASK_COMPLETED]          │
-│  - Does NOT measure the metric       │
-└──────────────────────────────────────┘
+If `--interactive` flag was passed, omit `--tmux` from the setup.js call.
+
+### Resume
+```bash
+python3 ~/.hermes/skills/autonomous-ai-agents/pickle-rick/scripts/setup.js" --command-template microverse.md --resume [<PATH>] --tmux [--max-iterations <N>]
 ```
+If `--interactive` flag was passed, omit `--tmux` from the setup.js call.
 
-## Quick Start
+Extract `SESSION_ROOT=<path>` from output. If `--resume`, skip Steps 3 and 4.
 
-### CLI Orchestrator (recommended)
+## Step 3: Create microverse.json (new sessions only)
+
+Write `${SESSION_ROOT}/microverse.json` conforming to `MicroverseSessionState`:
 
 ```bash
-python3 ~/.hermes/skills/autonomous-ai-agents/pickle-rick/scripts/microverse_runner.py \
-  --metric "pytest --cov=src --cov-report=term | tail -1" \
-  --task "Improve test coverage to 90%+" \
-  --working-dir ~/project \
-  --direction higher \
-  --stall-limit 5
+node -e "
+const fs = require('fs');
+const path = require('path');
+const sessionDir = process.argv[1];
+const type = process.argv[6] || 'command';
+const direction = process.argv[7] || 'higher';
+const keyMetric = {
+  description: process.argv[2],
+  validation: process.argv[3],
+  type: type,
+  timeout_seconds: 60,
+  tolerance: Number(process.argv[4]),
+  direction: direction
+};
+if (type === 'llm') keyMetric.judge_model = process.argv[8] || 'claude-sonnet-4-6';
+const state = {
+  status: 'gap_analysis',
+  prd_path: path.join(sessionDir, 'prd.md'),
+  key_metric: keyMetric,
+  convergence: {
+    stall_limit: Number(process.argv[5]),
+    stall_counter: 0,
+    history: []
+  },
+  gap_analysis_path: '',
+  failed_approaches: [],
+  baseline_score: 0
+};
+fs.writeFileSync(path.join(sessionDir, 'microverse.json'), JSON.stringify(state, null, 2));
+console.log('microverse.json created');
+" "${SESSION_ROOT}" "<TASK_TEXT>" "<VALIDATION>" "<TOLERANCE>" "<STALL_LIMIT>" "<TYPE>" "<DIRECTION>" "<JUDGE_MODEL>"
 ```
 
-### With tmux Monitoring (recommended for long runs)
+Replace placeholders with parsed values:
+- `<VALIDATION>` = metric command (if `--metric`) or goal text (if `--goal`)
+- `<TYPE>` = `command` (if `--metric`) or `llm` (if `--goal`)
+- `<DIRECTION>` = from `--direction` flag (default `higher`)
+- `<JUDGE_MODEL>` = from `--judge-model` flag (default `claude-sonnet-4-6`, only used when type=`llm`)
 
+Verify: `node -e "const s=JSON.parse(require('fs').readFileSync('${SESSION_ROOT}/microverse.json','utf-8')); console.log('status:', s.status, 'metric:', s.key_metric.validation, 'stall_limit:', s.convergence.stall_limit)"`
+
+## Step 4: Write prd.md (new sessions only)
+
+Write `${SESSION_ROOT}/prd.md`:
+
+```markdown
+# Microverse Optimization PRD
+
+## Objective
+<TASK_TEXT>
+
+## Key Metric
+- **Type**: <TYPE> (`command` or `llm`)
+- **Command** (if type=command): `<METRIC_CMD>`
+- **Goal** (if type=llm): <GOAL_TEXT>
+- **Direction**: <DIRECTION> (higher or lower is better)
+- **Tolerance**: <TOLERANCE>
+- **Stall Limit**: <STALL_LIMIT>
+
+## Success Criteria
+Continuously improve the metric score through targeted, incremental changes until convergence (no improvement for <STALL_LIMIT> consecutive iterations).
+
+## Constraints
+- One logical change per iteration
+- Never repeat failed approaches
+- Always commit changes for measurement
+- Metric is measured automatically after each iteration
+```
+
+## Step 5: Launch
+
+### Option A: tmux mode (default — no `--interactive` flag)
+
+1. Check tmux: `tmux -V`. If missing → print "Install tmux: `brew install tmux`" and STOP.
+
+2. Session name: `microverse-<hash>` from SESSION_ROOT basename.
+
+3. Read `working_dir` from `${SESSION_ROOT}/state.json`.
+
+4. Create tmux session:
 ```bash
-SCRIPTS=~/.hermes/skills/autonomous-ai-agents/pickle-rick/scripts
+tmux new-session -d -s <name> -c <working_dir>
+sleep 1
+```
+Print attach command: `tmux attach -t <name>`
 
-# Initialize session
-SESSION_DIR=$(python3 $SCRIPTS/pickle_state.py \
-  init --task "Improve test coverage" --working-dir ~/project --mode microverse \
-  | grep SESSION_DIR | cut -d= -f2)
-
-SESSION_NAME="microverse-$(basename $SESSION_DIR | tail -c 9)"
-
-# Create tmux session with runner in window 0
-tmux new-session -d -s $SESSION_NAME -c ~/project
-tmux send-keys -t $SESSION_NAME:0 \
-  "python3 $SCRIPTS/microverse_runner.py \
-    --resume $SESSION_DIR \
-    --metric 'pytest --cov=src | tail -1' \
-    --direction higher --stall-limit 5" Enter
-
-# Launch 4-pane monitor dashboard in window 1
-bash $SCRIPTS/tmux-monitor.sh $SESSION_NAME $SESSION_DIR microverse
-
-# Attach
-tmux attach -t $SESSION_NAME
+5. Launch runner:
+```bash
+tmux send-keys -t <name>:0 "python3 ~/.hermes/skills/autonomous-ai-agents/pickle-rick/scripts/microverse-runner.js ${SESSION_ROOT}; echo ''; echo 'Microverse runner finished.  Ctrl+B 1 → monitor  |  Ctrl+B D → detach'; read" Enter
 ```
 
-The microverse monitor layout shows convergence history in pane 3 —
-live-updating score, stall counter, and recent accept/revert actions.
-
-### In a Hermes Session (single-context fallback)
-
-```
-> Run microverse: optimize test coverage. Metric: pytest --cov=src --cov-report=term | tail -1
+6. Launch monitor:
+```bash
+bash ~/.hermes/skills/autonomous-ai-agents/pickle-rick/scripts/tmux-monitor.sh" <name> ${SESSION_ROOT} pickle
 ```
 
-Note: single-session mode does NOT get clean context per iteration.
-Use the orchestrator for serious optimization work.
+7. Report: session name, `tmux attach -t <name>`, window layout (monitor: Ctrl+B 1; runner: Ctrl+B 0), cancel: `cd <working_dir> && eat-pickle`, emergency: `tmux kill-session -t <name>`, state path.
 
-## Metric Types
+Output: `[TASK_COMPLETED]`
 
-### Command-Based (--metric)
-A shell command whose last stdout line is a numeric score.
-```
---metric "npm run test:coverage 2>&1 | grep 'All files' | awk '{print $10}'"
---metric "pytest --tb=no -q 2>&1 | tail -1 | grep -oP '\\d+'"
---metric "npx lighthouse http://localhost:3000 --output=json | jq '.categories.performance.score'"
-```
+### Option B: Interactive mode (`--interactive` flag present)
 
-### LLM-Judged (--goal)
-Natural language goal scored by an LLM judge (0-100).
-```
---goal "Code readability and documentation quality"
---goal "API error handling completeness"
-```
+You ARE the convergence loop. Run it inline.
 
-## Configuration
+#### 5a: Gap Analysis (iteration 0)
 
-| Parameter | Default | Description |
-|-----------|---------|-------------|
-| --direction | higher | Whether higher or lower scores are better |
-| --tolerance | 0 | Score delta within which changes count as "held" |
-| --stall-limit | 5 | Non-improving iterations before convergence |
-| --max-iterations | 500 | Hard cap on total iterations |
-| --timeout | 1200 | Per-iteration worker timeout (seconds) |
-| --resume | — | Resume existing session directory |
+1. Read `${SESSION_ROOT}/prd.md`
+2. Run the metric validation command to see current score
+3. Analyze the codebase — use **Glob** and **Grep** (not bash grep) to understand what the metric measures, where relevant code lives, and current bottlenecks
+4. Write gap analysis to `${SESSION_ROOT}/gap_analysis.md`
+5. Update `microverse.json`: set `gap_analysis_path` to the gap analysis path
+6. Make initial improvements if obvious quick wins exist
+7. Commit: `git add -A && git commit -m "microverse: gap analysis and initial improvements"`
+8. Measure metric again, update `baseline_score` in `microverse.json`
+9. Update `microverse.json`: set `status` to `"iterating"`
 
-## The Convergence Loop
+#### 5b: Iteration Loop
 
-### Phase 1: Gap Analysis (Iteration 0)
+Repeat until converged or max iterations reached:
 
-First iteration — understand the codebase and metric:
+1. Read `microverse.json` for current state
+2. Record pre-iteration SHA: `git rev-parse HEAD`
+3. Plan **one targeted change** — consult `failed_approaches` to avoid repeats, review recent `convergence.history` for trends
+4. Implement the change using **Read**, **Edit**, **Glob**, **Grep** tools
+5. Measure the metric:
+   - If type=`command`: Run the metric validation command, parse the numeric score from the last line
+   - If type=`llm`: Do NOT run the validation as a shell command. The runner's LLM judge scores your changes — note this and proceed to commit. The judge will evaluate against the goal description.
+6. Compare score to previous. Use the last **accepted** history entry's score (i.e., filter out entries with action='reverted'), or baseline_score if no accepted entries yet. Comparison is **direction-aware** based on `key_metric.direction`:
+   - If direction=`higher` (default):
+     - **Improved** (score > previous + tolerance) → accept, set stall_counter = 0
+     - **Held** (within tolerance) → accept, increment stall_counter
+     - **Regressed** (score < previous - tolerance) → run `git reset --hard <pre-iteration-SHA>`, add description to `failed_approaches`, increment stall_counter
+   - If direction=`lower`:
+     - **Improved** (score < previous - tolerance) → accept, set stall_counter = 0
+     - **Held** (within tolerance) → accept, increment stall_counter
+     - **Regressed** (score > previous + tolerance) → run `git reset --hard <pre-iteration-SHA>`, add description to `failed_approaches`, increment stall_counter
+7. If accepted: `git add -A && git commit -m "microverse: <description>"`
+8. Add entry to `convergence.history`: `{iteration, metric_value, score, action, description, pre_iteration_sha, timestamp}`
+9. Write updated state to `microverse.json`
+10. Check: `stall_counter >= stall_limit` → set status to `"converged"`, exit loop
+11. Check: iteration >= max_iterations → set status to `"stopped"`, set `exit_reason` to `"limit_reached"`, exit loop
 
-1. Orchestrator measures baseline score
-2. Worker reads PRD/task, analyzes codebase, writes gap_analysis.md
-3. Worker makes initial improvements if obvious quick wins exist
-4. Worker commits: `git add -A && git commit -m "microverse: gap analysis"`
-5. Orchestrator measures again, records as baseline
+#### 5c: Finalize
 
-### Phase 2: Optimization Loop
-
-Repeat until converged or max iterations:
-
-1. Orchestrator records pre-iteration git SHA
-2. Spawns a fresh `hermes -q` worker with handoff context:
-   - Current metric state, recent history, failed approaches
-   - Worker makes ONE targeted change, commits
-   - Worker does NOT run the metric — orchestrator handles that
-3. Orchestrator measures the metric
-4. Compares to previous score (direction-aware):
-
-   **direction=higher:**
-   - score > previous + tolerance → IMPROVED (accept, reset stall counter)
-   - within tolerance → HELD (accept, increment stall counter)
-   - score < previous - tolerance → REGRESSED (revert to pre-SHA, add to failed_approaches)
-
-   **direction=lower:**
-   - score < previous - tolerance → IMPROVED (accept, reset stall counter)
-   - within tolerance → HELD (accept, increment stall counter)
-   - score > previous + tolerance → REGRESSED (revert to pre-SHA, add to failed_approaches)
-
-5. Updates microverse.json with history entry
-6. If stall_counter >= stall_limit → CONVERGED, stop
-7. If iteration >= max_iterations → STOPPED, stop
-
-### Phase 3: Finalize
-
-Report: total iterations, baseline score, best score, exit reason,
-accepted/reverted counts.
-
-## microverse.json Schema
-
-```json
-{
-  "status": "gap_analysis|iterating|converged|stopped",
-  "prd_path": "path/to/prd.md",
-  "key_metric": {
-    "description": "what we're optimizing",
-    "validation": "metric command or goal text",
-    "type": "command|llm",
-    "timeout_seconds": 60,
-    "tolerance": 0,
-    "direction": "higher|lower"
-  },
-  "convergence": {
-    "stall_limit": 5,
-    "stall_counter": 0,
-    "history": [
-      {
-        "iteration": 1,
-        "metric_value": "85.2%",
-        "score": 85.2,
-        "action": "accept|revert",
-        "description": "what was changed",
-        "pre_iteration_sha": "abc123",
-        "timestamp": "2026-03-17T12:00:00Z"
-      }
-    ]
-  },
-  "gap_analysis_path": "path/to/gap_analysis.md",
-  "failed_approaches": ["approach that was reverted"],
-  "baseline_score": 72.5,
-  "exit_reason": null
-}
-```
-
-## Session Artifacts
-
-```
-~/.pickle-rick/sessions/<timestamp>_<hash>/
-  state.json              # Session state
-  microverse.json         # Convergence state, metric history
-  prd.md                  # Optimization PRD
-  gap_analysis.md         # Initial codebase analysis
-  microverse_iter_N.log   # Per-iteration worker output
-  activity.jsonl          # Event log
-```
-
-## Signal Protocol
-
-| Token | Meaning | Effect |
-|-------|---------|--------|
-| `[TASK_COMPLETED]` | Worker finished one change | Orchestrator measures metric |
-| `[BLOCKED]` | Worker cannot make progress | Orchestrator stops |
+1. Update `microverse.json` with final status and `exit_reason`
+2. Print summary: total iterations, baseline score, best score, exit reason, accepted/reverted counts
+3. Output: `[TASK_COMPLETED]`
 
 ## Rules
 
-1. **One change per iteration** — atomic, revertible
-2. **Never repeat failed approaches** — always check failed_approaches list
-3. **Always commit before returning** — uncommitted changes are invisible to metric
-4. **Don't run the metric in the worker** — the orchestrator handles measurement
-5. **microverse.json is source of truth** — orchestrator updates after every iteration
-6. **Direction matters** — higher isn't always better (latency, bundle size, etc.)
+1. **--metric or --goal is mandatory** for new sessions — no metric/goal, no microverse. They are mutually exclusive (XOR).
+2. **One change per iteration** — atomic, revertible
+3. **Never repeat failed approaches** — always check `failed_approaches` before planning
+4. **Always commit** — uncommitted changes are invisible to measurement
+5. **Use built-in tools** — Glob for file search, Grep for content search, Read for files
+6. **microverse.json is the source of truth** — update it after every state change
 
-## Pitfalls
-
-1. **Metric command must output a number on the last line** — parse errors → score 0.0
-2. **Don't skip the commit** — git reset --hard reverts uncommitted AND committed work to pre-SHA
-3. **Stall limit too low = premature convergence** — use 5+ for serious optimization
-4. **LLM judge mode is not yet implemented** — use command metrics for now
-5. **Use tmux for long runs** — `tmux attach -t $SESSION_NAME` to monitor live
-6. **Worker doesn't measure** — if the worker runs the metric, the orchestrator re-measures anyway

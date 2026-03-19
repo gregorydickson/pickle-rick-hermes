@@ -1,7 +1,7 @@
 ---
 name: pickle-rick-help
-description: "Display Pickle Rick for Hermes help — list all available commands, skills, and utilities."
-version: 0.2.0
+description: "Display Pickle Rick for Hermes help — list all available commands, skills, and utilities. Synced with pickle-rick-claude v1.19.0."
+version: 0.3.0
 author: Gregory Dickson
 license: Apache-2.0
 metadata:
@@ -16,25 +16,29 @@ metadata:
 
 - User says "help pickle", "pickle rick help", "what pickle commands are there"
 
-## Skills (16 total)
+## Skills (20 total)
 
 | Skill | What It Does |
 |-------|-------------|
 | **pickle-rick** | Core autonomous loop: PRD -> Breakdown -> Implement -> Review -> Ship |
 | **pickle-rick-prd** | Interactive PRD drafter with user interview and verification-first design |
 | **pickle-rick-refine-prd** | 3 parallel analysts refine PRD + decompose into atomic tickets |
-| **pickle-rick-meeseeks** | Iterative code review (10-50 passes, 7 focus categories) |
+| **pickle-rick-meeseeks** | Iterative code review (10+ passes, 8 focus categories) |
 | **pickle-rick-microverse** | Convergence optimization (metric-driven iterative improvement) |
-| **pickle-rick-portal-gun** | Pattern transplantation from donor repos/packages + pattern library |
-| **pickle-rick-council** | PR stack review with agent-executable directives + GitNexus |
+| **pickle-rick-portal-gun** | Pattern transplantation v2: gene transfusion, import graph tracing, pattern library, convergence loop |
+| **pickle-rick-council** | PR stack review with agent-executable directives |
 | **pickle-rick-jar** | Batch job queue for sequential task execution |
 | **pickle-rick-morty** | Worker lifecycle: Research -> Plan -> Implement -> Verify -> Review -> Simplify |
 | **pickle-rick-morty-review** | Cross-ticket spec conformance + focused review worker |
 | **pickle-rick-chaos** | Project Mayhem: mutation testing, dependency downgrades, config corruption |
-| **pickle-rick-dot** | Convert PRDs to attractor-compatible DOT convergence graphs |
-| **pickle-rick-dot-patterns** | DOT pattern reference (12 convergence patterns, 3 tiers) |
-| **pickle-rick-attract** | Submit DOT pipelines to attractor server for execution |
-| **pickle-rick-tmux** | tmux/Zellij launcher with 4-pane live monitor dashboard |
+| **pickle-rick-dot** | Convert PRDs to attractor-compatible DOT graphs with 5-layer quality gates |
+| **pickle-rick-dot-patterns** | DOT pattern reference (22 convergence patterns, 3 tiers) |
+| **pickle-rick-attract** | Submit DOT pipelines to attractor server with detach mode + checkpoints |
+| **pickle-rick-tmux** | tmux launcher with live monitor dashboard |
+| **pickle-rick-zellij** | Zellij launcher with KDL layouts |
+| **pickle-rick-meeseeks-zellij** | Meeseeks review loop in Zellij |
+| **pickle-rick-standup** | Activity log standup formatter (Slack-formatted) |
+| **pickle-rick-retry** | Retry failed/timed-out tickets |
 | **pickle-rick-help** | This help screen |
 
 ## CLI Scripts
@@ -63,10 +67,6 @@ python3 scripts/pattern_library.py list
 python3 scripts/pattern_library.py search --query "auth"
 python3 scripts/pattern_library.py save --name "pattern" --analysis analysis.md
 
-# GitNexus
-python3 scripts/gitnexus_bridge.py check
-python3 scripts/gitnexus_bridge.py analyze --repo .
-
 # Utilities
 python3 scripts/pickle_utils.py status
 python3 scripts/pickle_utils.py cancel
@@ -92,6 +92,8 @@ bash scripts/tmux-monitor.sh <session-name> <session-dir> pickle
 "Project mayhem: stress test this project"
 "Add this to the pickle jar for later"
 "Generate a DOT pipeline from prd.md"
+"Submit this DOT to the attractor server"
+"Show me a standup of recent pickle work"
 ```
 
 ## Session Data
@@ -101,7 +103,9 @@ Jar data in `~/.pickle-rick/jar/`.
 Patterns in `~/.pickle-rick/patterns/`.
 Settings in `~/.pickle-rick/pickle_settings.json`.
 
+## Version
 
+Synced with pickle-rick-claude v1.19.0 (March 2026).
 
 ## Pitfalls
 

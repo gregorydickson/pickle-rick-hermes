@@ -1,7 +1,7 @@
 ---
 name: pickle-rick
-description: "Autonomous engineering loop: PRD → Breakdown → Implement → Review → Ship. Ported from pickle-rick-claude. Uses delegate_task for workers, external Python orchestrator for iteration loop, circuit breaker for safety."
-version: 0.2.0
+description: "Autonomous engineering loop: PRD → Breakdown → Research → Plan → Implement → Verify → Review → Simplify → Ship. Synced with pickle-rick-claude v1.19.0. Uses delegate_task for workers, external Python orchestrator for iteration loop, 3-state circuit breaker for safety."
+version: 0.3.0
 author: Gal Zahavi (original), Gregory Dickson (Hermes port)
 license: Apache-2.0
 metadata:
@@ -86,7 +86,7 @@ os.makedirs(session_dir, exist_ok=True)
   "working_dir": "/absolute/path/to/project",
   "step": "prd",
   "iteration": 0,
-  "max_iterations": 100,
+  "max_iterations": 500,
   "max_time_minutes": 720,
   "start_time_epoch": 1234567890,
   "original_prompt": "user's task description",

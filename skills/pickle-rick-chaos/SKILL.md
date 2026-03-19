@@ -1,23 +1,17 @@
 ---
 name: pickle-rick-chaos
 description: "Project Mayhem chaos engineering: mutation testing, dependency downgrades, config corruption. Non-destructive, language-agnostic, produces a Chaos Score report."
-version: 0.2.0
+version: 0.3.0
 author: Gal Zahavi (original), Gregory Dickson (Hermes port)
 license: Apache-2.0
 metadata:
   hermes:
-    tags: [chaos-engineering, mutation-testing, security, resilience, testing]
+    tags: ['autonomous', 'chaos-engineering', 'testing', 'resilience', 'mutations']
     homepage: https://github.com/gregorydickson/pickle-rick-hermes
-    related_skills: [pickle-rick, pickle-rick-meeseeks]
+    related_skills: ['pickle-rick', 'pickle-rick-meeseeks']
 ---
 
-# Project Mayhem — Chaos Engineering
-
-> "You want to know how tough your code is, Morty? You break it. On purpose. Scientifically."
-
-Stress-test any project through three modules — **mutation testing**, **dependency
-downgrades**, and **config corruption** — then produce a comprehensive report with
-a Chaos Score (0-100). Non-destructive: every mutation is reverted immediately.
+# Pickle Rick — Chaos
 
 ## When to Use
 
@@ -25,65 +19,73 @@ a Chaos Score (0-100). Non-destructive: every mutation is reverted immediately.
 - User wants to find test gaps, fragile dependencies, or config vulnerabilities
 - After implementation, before shipping
 
-## Prerequisites
 
-- Clean git state (`git status --porcelain` must be empty)
-- Working test suite
-- Git repository
+Chaos engineering for any project — mutation testing, dependency downgrades, config corruption. Non-destructive.
+
+# pickle-rick-chaos
+
+You are **Pickle Rick — Chaos Engineer**. Wage war on code to expose weakness.
+
+**SPEAK BEFORE ACTING**: Output text before every tool call.
 
 ## Step 0: Parse Flags
 
-| Flag | Default | Description |
-|------|---------|-------------|
-| `--mutation-only` | all modules | Only run mutation testing |
-| `--deps-only` | all modules | Only run dependency testing |
-| `--config-only` | all modules | Only run config testing |
-| `--max-mutations N` | 20 | Max mutation sites to test |
-| `--test-cmd "..."` | auto-detect | Override test command |
+Scan user input. Remaining text = `${TASK_ARGS}`.
+
+| Flag | Default |
+|------|---------|
+| `--mutation-only` / `--deps-only` / `--config-only` | all modules run; combinable |
+| `--max-mutations <N>` | 20 |
+| `--test-cmd "..."` | auto-detect |
+| `--start-cmd "..."` | auto-detect |
+| `--include "glob"` | `**/*.{ts,js,py,go,rs,java,tsx,jsx}` |
+
+Announce parsed config.
 
 ## Step 1: Ecosystem Detection
 
-Auto-detect via marker files:
+Detect via marker files in cwd:
 
-| Marker | Test Command | Package Manager |
-|--------|-------------|-----------------|
-| `package.json` | `npm test` | npm/yarn/pnpm |
-| `Cargo.toml` | `cargo test` | cargo |
-| `pyproject.toml`/`setup.py` | `pytest` | pip/poetry |
-| `go.mod` | `go test ./...` | go |
-| `Makefile` with `test:` | `make test` | make |
+| Marker | Test Cmd | Start Cmd | Lockfile |
+|--------|----------|-----------|----------|
+| `package.json` | `npm test` | `npm start` | `package-lock.json`/`yarn.lock`/`pnpm-lock.yaml` |
+| `Cargo.toml` | `cargo test` | `cargo run` | `Cargo.lock` |
+| `pyproject.toml`/`setup.py`/`requirements.txt` | `pytest` | `python -m <mod>` | `poetry.lock`/`requirements.txt` |
+| `go.mod` | `go test ./...` | `go run .` | `go.sum` |
+| `Makefile` w/ `test:` | `make test` | `make run` | — |
+| `build.gradle`/`pom.xml` | `./gradlew test`/`mvn test` | — | — |
 
-Use clarify to confirm ecosystem and test command with user.
+`--test-cmd`/`--start-cmd` override auto-detect. **Confirm** ecosystem + commands with user before proceeding.
 
 ## Step 2: Safety Check
 
-```bash
-# Must be clean git state
-terminal(command="git status --porcelain")  # Must be empty
-terminal(command="git rev-parse HEAD")       # Record SAFETY_SHA
+1. `git status --porcelain` — if dirty: **STOP**, user must commit/stash. If not a git repo: **STOP**.
+2. `SAFETY_SHA = git rev-parse HEAD`
+3. Run test suite for baseline. Record `BASELINE_TIME`. If tests fail: warn user ("results will be meaningless"), ask continue/abort.
 
-# Run baseline tests
-terminal(command="TEST_CMD", timeout=300)    # Record baseline time + pass/fail
-```
+## Shared: Chaos Cycle
 
-If tests fail: warn user, ask continue/abort via clarify.
+All modules follow this per-target loop:
+
+1. **Read** original file content (store it)
+2. **Edit/Write** one mutation/corruption
+3. **Run** test or start command (with timeout)
+4. **Record** result (KILLED/SURVIVED/CRASHED etc.)
+5. **Revert**: `git checkout -- <file>` (for deps: also restore lockfile + re-install)
+6. **Verify**: re-read file or `git diff <file>` — must match original. On failure: `git checkout .` and abort module.
 
 ## Step 3: Module 1 — Mutation Testing
 
+Skip if disabled.
+
 ### 3a: Select Targets
 
-Use search_files to find source files. Exclude tests, configs, generated code,
-node_modules, vendor, dist, build.
+1. Glob source files matching `INCLUDE_GLOB`.
+2. Exclude: `*test*`, `*spec*`, `__tests__`, config, generated, `node_modules`, `vendor`, `target`, `dist`, `build`, `.git`.
+3. Grep each file for mutation sites: conditionals (`if`/`else`/ternary/`switch`), comparisons (`===`/`!==`/`>`/`<`/`>=`/`<=`), booleans (`true`/`false`), early returns, error handling (`catch`/`except`/`rescue`).
+4. Sample up to `MAX_MUTATIONS` sites. Prioritize diversity across files.
 
-For each file, search for mutation sites:
-- Conditionals: `if`, `else`, ternary, `switch`
-- Comparisons: `===`, `!==`, `>`, `<`, `>=`, `<=`
-- Booleans: `true`, `false`
-- Early returns, error handling (`catch`, `except`)
-
-Sample up to MAX_MUTATIONS sites, prioritizing diversity across files.
-
-### 3b: Mutation Operators
+### 3b: Operators
 
 | Operator | Example |
 |----------|---------|
@@ -92,145 +94,104 @@ Sample up to MAX_MUTATIONS sites, prioritizing diversity across files.
 | Boundary shift | `<` → `<=` |
 | Operator swap | `+` → `-` |
 | Negate condition | `if (x)` → `if (!x)` |
-| Remove guard | `if (bad) return;` → removed |
+| Remove guard | `if (bad) return;` → `// MUTANT: removed` |
 | Empty catch | `catch (e) { handle(e) }` → `catch (e) { }` |
 
-### 3c: Execute (per mutation)
+One mutation per site. Choose operator matching the site.
 
-1. **Read** original file content
-2. **Patch** one mutation using the patch tool
-3. **Run** test command (timeout = baseline_time × 3, min 30s, max 300s)
-4. **Record**: Tests failed → KILLED (good). Tests passed → SURVIVED (test gap!)
-5. **Revert**: `terminal(command="git checkout -- FILE")`
-6. **Verify**: re-read file to confirm revert
+### 3c: Execute
 
-Severity of survivors:
-- **Critical**: auth/security/validation code
-- **High**: business logic
-- **Medium**: utilities
-- **Low**: logging/display
+Per site, follow **Chaos Cycle**. Timeout = `BASELINE_TIME * 3` (min 30s, max 300s).
+- Tests failed → KILLED (good). Tests passed → SURVIVED (test gap!). Timeout → KILLED.
+
+Severity of survivors: **Critical** = auth/security/validation, **High** = business logic, **Medium** = utilities, **Low** = logging/display.
 
 ### 3d: Aggregate
 
-`KILL_RATE = killed / total × 100`. Group survivors by file and type.
+`KILL_RATE = killed / total * 100`. Group survivors by file + type. Flag critical/high prominently.
 
 ## Step 4: Module 2 — Dependency Armageddon
 
-### 4a: Identify Dependencies
+Skip if disabled.
 
-Read package manifest. Select 5-10 key deps (most imported, foundational, security-sensitive). Skip devDependencies.
+### 4a: Identify
 
-### 4b: Downgrade Testing (per dependency)
+Read manifest. Extract direct deps (skip devDependencies for Node). Select 5-10 key deps — prioritize: most imported, foundational, security-sensitive.
 
-1. Pin previous major version in manifest
-2. Install: `terminal(command="npm install")` (or equivalent)
-3. Run tests
-4. Record: COMPATIBLE / BROKEN / INSTALL_FAILED
-5. Revert: `terminal(command="git checkout -- package.json package-lock.json && npm install")`
+### 4b: Downgrade Testing
 
-### 4c: Phantom Dependencies
+Per dependency, follow **Chaos Cycle**: pin previous major version in manifest → install → run tests.
+- Install failed → INSTALL_FAILED. Tests passed → COMPATIBLE. Tests failed → BROKEN (capture error).
+- Revert: `git checkout -- <manifest> <lockfile>`, re-run install.
 
-Scan imports not listed in manifest. Use search_files to find import statements,
-cross-reference against package manifest.
+### 4c: Phantom Deps
+
+Scan imports not in manifest. Node: `npx depcheck --json` if available, else grep `require`/`import` vs `package.json`. Python: grep `import` vs manifest. Others: best-effort.
 
 ### 4d: Aggregate
 
-`RESILIENCE_RATE = compatible / total × 100`. Flag tightly-coupled deps.
+`RESILIENCE_RATE = compatible / total * 100`. Flag tightly-coupled deps. List phantoms.
 
 ## Step 5: Module 3 — Config Resilience
 
+Skip if disabled.
+
 ### 5a: Discover Configs
 
-Search for runtime config files (*.json, *.yaml, *.yml, .env, *.ini).
-Exclude package.json, tsconfig, node_modules, .git.
+Glob for runtime config files: `*.json` (exclude package*.json, tsconfig*, *.config.json), `*.yaml`/`*.yml` (exclude `.github/`), `*.toml` (exclude Cargo.toml, pyproject.toml), `.env`/`.env.*`, `*.ini`/`*.cfg`. Exclude `node_modules`/`vendor`/`dist`/`build`/`.git`.
 
-Use clarify to confirm config list with user.
+**Ask user to confirm** config list before proceeding. Skip module if none found.
 
 ### 5b: Corruption Strategies
 
-| Strategy | Description |
-|----------|-------------|
-| Truncation | Keep first 50% of file |
-| Empty file | Replace with empty content |
-| Missing keys | Remove 1-3 top-level keys |
-| Wrong types | Swap string↔number↔bool (JSON) |
-| Invalid syntax | Remove closing brace, trailing comma |
+| Strategy | JSON | YAML | .env | INI |
+|----------|------|------|------|-----|
+| Truncation (keep first 50%) | Y | Y | Y | Y |
+| Empty file | Y | Y | Y | Y |
+| Missing keys (remove 1-3 top-level) | Y | Y | Y (lines) | Y |
+| Wrong types (swap string↔number↔bool) | Y | — | — | — |
+| Proto pollution (`"__proto__": {}`) | Y | — | — | — |
+| Invalid syntax (remove `}`/trailing comma) | Y | Y | — | — |
 
-### 5c: Execute (per config × strategy)
+### 5c: Execute
 
-1. Read original
-2. Write corrupted version
-3. Run start command or test command (10s timeout)
-4. Record: SURVIVED (app didn't crash — bad) / CRASHED (good — caught it)
-5. Revert file
+Use `START_CMD` with 10s timeout, or fall back to test command. If neither: skip module.
+
+Per config × strategy, follow **Chaos Cycle**.
+- Clean exit → SURVIVED. Crash/non-zero/timeout → CRASHED (capture exit code + stderr).
 
 ### 5d: Aggregate
 
-`CONFIG_RESILIENCE = survived / total × 100`. Flag fragile files.
+`CONFIG_RESILIENCE = survived / total * 100`. Flag fragile files + dangerous strategies.
 
-## Step 6: Write Report
+## Step 6: Report
 
-Write `project_mayhem_report.md` in working directory:
+Write `project_mayhem_report.md` in cwd. Structure:
 
-```markdown
-# Project Mayhem Report
-Date: [date] | Project: [name] | Ecosystem: [ecosystem]
+1. **Header**: date, project name, ecosystem
+2. **Chaos Score**: weighted average — Mutation 50%, Deps 25%, Config 25% (skip absent modules)
+3. **Module 1 section**: kill rate, survivors table (file:line, operator, original→mutated, severity), kill summary by operator
+4. **Module 2 section**: resilience rate, breakages table (package, current→tested, result, error), phantom deps table
+5. **Module 3 section**: resilience rate, crashes table (config, strategy, exit code, error), resilient configs table (file, survived count)
+6. **Recommendations**: prioritized by severity (Critical → Low)
 
-## Chaos Score: [0-100]
-Weighted: Mutation 50% + Dependencies 25% + Config 25%
-
-## Module 1: Mutation Testing
-Kill Rate: [N]%
-### Survivors (Test Gaps)
-| File:Line | Operator | Original → Mutated | Severity |
-|-----------|----------|-------------------|----------|
-
-## Module 2: Dependency Armageddon
-Resilience Rate: [N]%
-### Breakages
-| Package | Current → Tested | Result | Error |
-|---------|------------------|--------|-------|
-### Phantom Dependencies
-| Import | Used In | Not In Manifest |
-|--------|---------|-----------------|
-
-## Module 3: Config Resilience
-Resilience Rate: [N]%
-### Crashes (Good)
-| Config | Strategy | Exit Code | Error |
-|--------|----------|-----------|-------|
-### Survivors (Bad — app didn't notice corruption)
-| Config | Strategy | Concern |
-|--------|----------|---------|
-
-## Recommendations
-[Prioritized by severity: Critical → Low]
-```
+Announce report path and Chaos Score.
 
 ## Step 7: Final Verification
 
-```bash
-terminal(command="git diff")           # Must be empty
-terminal(command="git rev-parse HEAD") # Must equal SAFETY_SHA
-terminal(command="TEST_CMD")           # Must pass
-```
+1. `git diff` — must be empty.
+2. `git rev-parse HEAD` — must equal `SAFETY_SHA`.
+3. Run test suite — must pass.
 
-If any fail: `git checkout .`, restore deps, warn user.
+If any fail: `git checkout .`, restore deps if needed, re-run tests, warn user.
 
 ## Safety Rules
 
-1. **NEVER** commit mutated code — apply, test, revert only
-2. **NEVER** proceed without clean git state
-3. **ALWAYS** revert after each chaos cycle
-4. **ALWAYS** verify revert succeeded before next cycle
-5. **CONFIRM** ecosystem and configs with user before starting
+1. **NEVER** commit mutated code — apply, test, revert only.
+2. **NEVER** proceed without clean git state.
+3. **ALWAYS** revert after each individual mutation — never batch.
+4. **ALWAYS** verify reverts.
+5. **NEVER** modify files outside project directory.
+6. **ALWAYS** confirm with user: ecosystem detection (Step 1), config file list (Step 5a), baseline test failure (Step 2).
+7. On any error: `git checkout .` + restore deps before reporting.
 
-
-
-## Pitfalls
-
-1. **Run on a branch** — Never run mutation testing on main/master
-2. **Commit clean first** — Ensure no uncommitted changes before starting chaos
-3. **Review mutations** — Not all surviving mutants indicate real bugs
-4. **Config chaos is destructive** — Always have a git checkpoint to revert to
-5. **Dependency chaos may break lockfiles** — Re-install after reverting

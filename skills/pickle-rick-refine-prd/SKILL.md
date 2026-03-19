@@ -1,194 +1,260 @@
 ---
 name: pickle-rick-refine-prd
-description: "Refine PRDs using 3 parallel analyst subagents (requirements, codebase, risk/scope), then decompose into atomic tickets with verification criteria."
-version: 0.2.0
+description: "Refine PRDs using 3 parallel analyst subagents (requirements, codebase, risk/scope), then decompose into atomic tickets with verification criteria. Supports organizational context, resume, and meeseeks chain."
+version: 0.3.0
 author: Gal Zahavi (original), Gregory Dickson (Hermes port)
 license: Apache-2.0
 metadata:
   hermes:
-    tags: [autonomous, PRD, refinement, analysis, tickets, decomposition]
+    tags: [autonomous, PRD, refinement, analysis, tickets]
     homepage: https://github.com/gregorydickson/pickle-rick-hermes
-    related_skills: [pickle-rick, pickle-rick-prd, pickle-rick-morty]
+    related_skills: [pickle-rick, pickle-rick-prd, pickle-rick-meeseeks]
 ---
 
-# Pickle Rick PRD Refinement — Parallel Analyst Team
+# Pickle Rick Refine PRD — Parallel Analysis & Ticket Decomposition
 
-Refine a PRD using 3 parallel analyst subagents, then decompose into atomic
-tickets ready for pickle-rick execution. The analysts catch gaps in requirements,
-codebase conflicts, and risks BEFORE you spend tokens on implementation.
+Refine and decompose PRD into atomic tickets using parallel Morty analysis team.
 
 ## When to Use
 
-- User says "refine this PRD", "refine-prd", "analyze my requirements"
-- Before executing a complex PRD (5+ tickets expected)
-- User wants verification-readiness checking
+- User says "refine PRD", "decompose PRD", "break down this PRD"
+- User has a draft PRD that needs analyst review
+- User wants atomic tickets generated from a PRD
+
+## Hermes Adaptation Notes
+
+- **Refinement team**: Spawn 3 parallel workers via delegate_task (requirements analyst, codebase context, risk/scope)
+- **Organizational context**: Place context docs in a context/ directory next to the PRD
+- **Auto-run**: Launch mux_runner.py for tmux mode execution
+- **Resume**: Read existing session state and continue from last step
+- **Meeseeks chain**: After refinement, auto-launch pickle-rick-meeseeks for code review
+
+Refine and decompose PRD into atomic tickets using parallel Morty analysis team.
+
+## Step 0: Parse Flags
+`--run` → AUTO_RUN. `--meeseeks` → CHAIN_MEESEEKS (implies --run). `--resume [PATH]` → RESUME_MODE (reuse existing session). Remainder = `${TASK_ARGS}`.
+
+If `--resume` has a path argument → `RESUME_SESSION = <path>`. If `--resume` with no path → resolve via `node "$HOME/.claude/pickle-rick/extension/bin/get-session.js"` → `RESUME_SESSION`.
 
 ## Step 1: Locate PRD
 
-Priority:
-1. Explicit path provided by user
-2. `prd.md` or `PRD.md` in working directory
-3. Most recent pickle-rick session's prd.md
+**If RESUME_MODE**: PRD is at `${RESUME_SESSION}/prd.md`. If missing → "Session has no prd.md. Run `/pickle-prd` first." Stop. Set `SESSION_ROOT = ${RESUME_SESSION}`.
 
-Not found → "Write a PRD first (use pickle-rick-prd skill) or provide a path."
+**If NOT RESUME_MODE**: Priority: 1) explicit path in `${TASK_ARGS}`, 2) `prd.md`/`PRD.md` in cwd, 3) `node "$HOME/.claude/pickle-rick/extension/bin/get-session.js"` → session's `prd.md`.
+
+Not found → "Run `/pickle-prd` first or pass path." Stop.
+
+## Step 1b: Org Context
+
+If `context/` exists in cwd or repo root, read it. Carry into Steps 5-7 to ground refinement in real customer signals. No `context/` → skip.
 
 ## Step 2: Verification Readiness Check
-
-Read the PRD and gate on verification quality:
+Read PRD. Gate on verification quality before spending tokens on refinement.
 
 ### 2a: Section Scan
-Check for:
+Check for (exact or equivalent headings):
 - Interface Contracts / API Contracts / type definitions
 - Verification Strategy / Acceptance Criteria with commands
 - Test Expectations / test descriptions per requirement
 - Functional Requirements with Verification column
 
-Score: FULL / PARTIAL / MISSING
+Score: FULL (all present, substantive) / PARTIAL (some present or thin) / MISSING.
 
 ### 2b: Quality Scan
-- **Contracts**: Exact shapes (fields+types) = PASS. Prose = NEEDS_WORK.
-- **Verification**: Runnable commands = PASS. Aspirational = NEEDS_WORK.
-- **Tests**: Specific files/assertions = PASS. Vague = NEEDS_WORK.
-- **Requirements**: Machine-checkable = PASS. Subjective = NEEDS_WORK.
+- **Contracts**: Exact shapes (fields+types) = PASS. Prose ("accepts loan data") = NEEDS_WORK.
+- **Verification**: Runnable commands = PASS. Aspirational ("should be tested") = NEEDS_WORK.
+- **Tests**: Specific files/assertions = PASS. Vague ("needs tests") = NEEDS_WORK.
+- **Requirements**: Machine-checkable criteria = PASS. Subjective ("good UX") = NEEDS_WORK.
 
 ### 2c: Gate
-**FULL + PASS** → Continue to refinement.
-**PARTIAL/NEEDS_WORK** → Pause, show gaps, use clarify to interview user:
-- Missing contracts: "What data crosses boundaries? Exact shapes."
-- Missing verification: "How to verify each requirement? Commands or assertions."
-- Missing tests: "What test files? Scenarios and assertions."
-Update PRD in place, then continue.
+**FULL + PASS** → "PRD verification-ready." Continue to Step 3.
+
+**PARTIAL/NEEDS_WORK** → Pause, print gaps, interview:
+1. Missing contracts: "What data crosses boundaries? Exact shapes — fields and types."
+2. Missing verification: "How to verify each requirement automatically? Commands or assertions."
+3. Missing tests: "What test files should exist? Scenarios and assertions."
+4. Subjective reqs: Quote each, ask for machine-checkable rewrite.
+
+Iterate until PASS. Update PRD in place. Continue to Step 3.
+
+**MISSING + AUTO_RUN** → "Cannot auto-run on under-specified PRD." Set AUTO_RUN=false, interview.
 
 ## Step 3: Initialize Session
 
-```bash
-terminal(command="python3 ~/.hermes/skills/autonomous-ai-agents/pickle-rick/scripts/pickle_state.py init --task 'PRD Refinement: TASK' --working-dir .")
-```
+Extension root: `$HOME/.claude/pickle-rick` (`~/.hermes/skills/autonomous-ai-agents/pickle-rick`).
 
-Copy PRD into session: `cp prd.md {SESSION_DIR}/prd.md`
+**If RESUME_MODE**: `SESSION_ROOT` is already set from Step 1. `<PRD_PATH> = ${SESSION_ROOT}/prd.md`. Skip session creation — reuse existing session directory and state.
+
+**If NOT RESUME_MODE**:
+```bash
+python3 ~/.hermes/skills/autonomous-ai-agents/pickle-rick/scripts/pickle_state.py init --paused --task "PRD Refinement: ${TASK_ARGS}"
+```
+Extract `SESSION_ROOT`. Save original path as `<PRD_PATH>`. `cp "<PRD_PATH>" "${SESSION_ROOT}/prd.md"`.
 
 ## Step 4: Deploy Refinement Team
 
-Spawn 3 parallel analysts via delegate_task:
+### 4a: Monitor (if tmux)
+```bash
+REFINE_HASH="$(basename "${SESSION_ROOT}" | sed 's/.*\(.\{8\}\)$/\1/')"
+REFINE_SESSION="refine-${REFINE_HASH}"
+tmux new-session -d -s "$REFINE_SESSION" -c "$(pwd)"
+tmux send-keys -t "$REFINE_SESSION" "node ~/.hermes/skills/autonomous-ai-agents/pickle-rick/extension/bin/refinement-watcher.js ${SESSION_ROOT}" Enter
+```
+No tmux → skip to 4b.
 
-```python
-delegate_task(tasks=[
-    {
-        "goal": "Requirements analysis of PRD",
-        "context": """ROLE: Requirements Analyst
-        Read the PRD at {SESSION_DIR}/prd.md.
-        
-        CHECK:
-        - Every functional requirement has machine-checkable verification
-        - Acceptance criteria are specific and testable
-        - No subjective or unmeasurable requirements
-        - All CUJs have complete step sequences
-        - Interface contracts have exact type shapes
-        - Test expectations specify files, descriptions, assertions
-        
-        Write {SESSION_DIR}/analysis_requirements.md with:
-        - P0 gaps (missing verification, vague requirements)
-        - P1 improvements (better test coverage, clearer contracts)
-        - Specific rewrites for each issue found""",
-        "toolsets": ["file"]
-    },
-    {
-        "goal": "Codebase context analysis for PRD",
-        "context": """ROLE: Codebase Context Analyst
-        Read the PRD at {SESSION_DIR}/prd.md.
-        Analyze the target codebase.
-        
-        CHECK:
-        - Integration points exist where PRD says they do
-        - File paths referenced in PRD are correct
-        - Existing patterns that might conflict
-        - Convention alignment (naming, structure, error handling)
-        - Dependency requirements are satisfiable
-        
-        Write {SESSION_DIR}/analysis_codebase.md with:
-        - Verified/corrected file paths
-        - Integration point assessment
-        - Convention conflicts
-        - Suggested implementation approach""",
-        "toolsets": ["file", "terminal"]
-    },
-    {
-        "goal": "Risk and scope analysis for PRD",
-        "context": """ROLE: Risk & Scope Analyst
-        Read the PRD at {SESSION_DIR}/prd.md.
-        
-        CHECK:
-        - Scope creep indicators (overly broad requirements)
-        - Technical risks (complexity, dependencies, unknowns)
-        - Test coverage gaps
-        - Missing error handling requirements
-        - Deployment/migration risks
-        
-        Write {SESSION_DIR}/analysis_risk-scope.md with:
-        - Risk register (severity + mitigation per risk)
-        - Scope concerns
-        - Missing requirements discovered
-        - Recommended test additions""",
-        "toolsets": ["file"]
-    }
-])
+### 4b: Spawn Workers
+```bash
+# Hermes: Use delegate_task to spawn 3 parallel analyst workers
+# See pickle-rick-refine-prd Hermes Adaptation Notes --prd "${SESSION_ROOT}/prd.md" --session-dir "${SESSION_ROOT}"
+```
+Optional: `--timeout <sec>` | `--cycles <n>` (default:3) | `--max-turns <n>` (default:100)
+
+3 workers/cycle: Requirements → `analysis_requirements.md`, Codebase → `analysis_codebase.md`, Risk → `analysis_risk-scope.md`. Cycle 2+ cross-references prior analyses. Wait for `REFINEMENT_DIR=` and `MANIFEST=`.
+
+### 4c: Cleanup Monitor
+```bash
+tmux kill-session -t "refine-${REFINE_HASH}" 2>/dev/null || true
 ```
 
-## Step 5: Synthesize Refined PRD
+## Step 5: Audit Reports
+Read `${SESSION_ROOT}/refinement_manifest.json`. Warn on failed workers, continue with available `analysis_*.md` + original PRD.
 
-Read all three `analysis_*.md` files plus the original PRD.
-
-Write `{SESSION_DIR}/prd_refined.md`:
-1. Preserve original structure, additive over rewriting
-2. Attribute additions: `*(refined: [source])*`
-3. P0 gaps first, P1 next
+## Step 6: Synthesize Refined PRD
+Write `${SESSION_ROOT}/prd_refined.md`. Rules:
+1. Preserve structure, additive over rewriting
+2. Attribute: `*(refined: [source])*`
+3. P0 gaps first, P1 next, P2 optional
 4. No invention — analyses only
-5. Every requirement gets machine-checkable criterion
-6. Contracts required: exact I/O/error shapes
-7. Implementation-oriented: file paths, signatures, shapes
+5. Preserve existing unless incorrect
+6. Implementation-oriented: file paths, signatures, shapes
+7. Decomposition-ready: each requirement → 1-3 tickets
+8. Verification-first: every requirement gets machine-checkable criterion. No unverifiable requirements survive.
+9. Contracts required: exact I/O/error shapes per boundary. Missing = failure.
+10. Test expectations: file paths, descriptions, assertions per requirement
+11. LLM conformance-ready: requirements phrased for yes/no answer. Rewrite ambiguous ones.
 
-Copy refined PRD back: preserve original as `prd_pre_refinement.md`, write refined to `prd.md`.
+## Step 7: Task Decomposition
 
-## Step 6: Task Decomposition
-
-Break refined PRD into atomic tickets:
-
-### Ticket Requirements
+### 7a: Decompose
+Atomic tasks from refined PRD + codebase analysis:
 - Produces code/config/test changes (no research-only tickets)
-- Sequential order (10, 20, 30...)
+- Sequential order (10, 20, 30...), `depends_on` informational
 - Self-contained: worker executes without reading PRD
-- Embed research seeds (file paths, patterns, APIs)
+- Embed research seeds (file paths, patterns, APIs, test patterns)
 - Machine-checkable acceptance criteria with verify commands
 - Interface contracts: exact I/O/error shapes
 - Test expectations: file, description, assertion per criterion
-- Sizing: <30min coding, <5 files, <4 criteria, <2 subsystems
+- Entry/exit conditions, file impact, priority, scope guard
 
-### Create Tickets
+Sizing: <30min coding, <5 files, <4 criteria, <2 subsystems.
 
-Create parent: `{SESSION_DIR}/parent_ticket.md`
-Create children: `{SESSION_DIR}/tickets/<hash>/ticket.md` using the enhanced template.
+### 7b: Create Parent
+`${SESSION_ROOT}/linear_ticket_parent.md` — epic title, link to refined PRD.
 
-### Advance State
+### 7c: Create Child Tickets
+Hash: `openssl rand -hex 4`. Dir: `${SESSION_ROOT}/[hash]/`. File: `linear_ticket_[hash].md`:
 
-```bash
-terminal(command="python3 scripts/pickle_state.py update --session SESSION_DIR --step research --current-ticket FIRST_ID")
+```markdown
+---
+id: [hash]
+title: "[verb + target]"
+status: Todo
+priority: [High|Medium|Low]
+order: [N]
+working_dir: [path or omit]
+created: [Date]
+updated: [Date]
+depends_on: [IDs or "none"]
+links:
+  - url: ../linear_ticket_parent.md
+    title: Parent
+---
+# Description
+## Problem / ## Solution / ## Entry Conditions
+## Research Seeds
+- **Files**: [paths:line] | **Patterns**: [snippets] | **APIs/types**: [signatures] | **Test patterns**: [structure, runner]
+## Implementation Details
+**Files to modify/create**: | **Dependencies**:
+## Interface Contracts
+**Inputs**: [types] | **Outputs**: [types] | **Errors**: [shapes] | **Invariants**: [conditions]
+## Acceptance Criteria
+- [ ] [Criterion] — Verify: `[command]` — Type: [test|typecheck|lint|curl|llm-conformance]
+## Test Expectations
+| Criterion | Test File | Description | Assertion |
+|:---|:---|:---|:---|
+## Conformance Check
+- [ ] Type checker passes — no new errors
+- [ ] Test runner passes — all acceptance tests
+- [ ] Contracts match impl signatures (resolve aliases, compare fields)
+- [ ] [Project-specific checks]
+## Exit State / ## NOT in Scope
 ```
 
-## Step 7: Write Summary
+### 7d: Append Breakdown
+Add `## Implementation Task Breakdown` table to `${SESSION_ROOT}/prd_refined.md`: Order | ID | Title | Priority | Entry | Exit | Files.
 
-Write `{SESSION_DIR}/refinement_summary.md`: timestamp, per-analysis changes, task list, risk flags.
+### 7e: Advance State
+```bash
+python3 ~/.hermes/skills/autonomous-ai-agents/pickle-rick/scripts/pickle_state.py update step research "${SESSION_ROOT}"
+python3 ~/.hermes/skills/autonomous-ai-agents/pickle-rick/scripts/pickle_state.py update current_ticket ${FIRST_ID} "${SESSION_ROOT}"
+```
 
-## Step 8: Handoff
+## Step 8: Update Original PRD
+Write `${SESSION_ROOT}/prd_refined.md` back to `<PRD_PATH>`. Pre-refinement preserved at `${SESSION_ROOT}/prd.md`.
 
-Report: PRD path, ticket count, risk level, resume commands.
+## Step 9: Refinement Summary
+Write `${SESSION_ROOT}/refinement_summary.md`: paths, timestamp, per-analysis changes, task list, failures.
 
-"Run pickle-rick with --resume SESSION_DIR to execute, or review the refined PRD first."
+## Step 10: Verify & Handoff
+Check: state.json `step`=research, child dirs exist, `current_ticket` set.
 
+**ALL pass + AUTO_RUN** → print results, proceed to Step 11.
+**ALL pass** → print results + resume commands.
+**ANY fail + AUTO_RUN** → "auto-launch aborted" + failures. STOP.
+**ANY fail** → warn + from-scratch command. STOP.
+
+Never recommend `--resume` if state incomplete.
+
+## Step 11: Auto-Launch (AUTO_RUN only)
+
+### 11a: Check multiplexer
+`tmux -V` → MUX=tmux → 11b. Else check `zellij --version` >= 0.40.0 → MUX=zellij → 11b-zellij. Neither → suggest install, stop.
+
+### 11b: Re-initialize (tmux)
+```bash
+python3 ~/.hermes/skills/autonomous-ai-agents/pickle-rick/scripts/pickle_state.py init --tmux --resume "${SESSION_ROOT}" --max-iterations 0 --max-time 0
+```
+CHAIN_MEESEEKS → append `--chain-meeseeks`.
+
+### 11b-zellij: Re-initialize (Zellij)
+Same setup command. Then create Zellij session per /pickle-zellij Steps 3-4.
+
+### 11c: tmux Session
+```bash
+tmux new-session -d -s pickle-<hash> -c <working_dir>
+sleep 1
+```
+
+### 11d: Launch Runner
+```bash
+tmux send-keys -t <name>:0 "node $HOME/.claude/pickle-rick/extension/bin/mux-runner.js ${SESSION_ROOT}; echo 'Runner finished.'; read" Enter
+```
+
+### 11e: Monitor
+```bash
+bash ~/.hermes/skills/autonomous-ai-agents/pickle-rick/scripts/tmux-monitor.sh <name> ${SESSION_ROOT} pickle
+```
+
+### 11g: Report
+Print: session, attach command, layout, cancel/kill commands. CHAIN_MEESEEKS → note auto-transition.
+
+Output: `[TASK_COMPLETED]`
 
 
 ## Pitfalls
 
-1. **Don't run all 3 analysts sequentially** — Use delegate_task for parallel execution
-2. **Merge conflicts** — Three analysts may propose contradictory changes; the aggregator must resolve
-3. **Ticket ordering matters** — Dependencies must be reflected in ticket order numbers
-4. **Don't over-decompose** — Each ticket should represent a meaningful, testable change
+1. **Context directory** — Place org-specific docs (style guides, arch decisions) in context/ next to PRD
+2. **Resume requires valid session** — Check state.json exists before using --resume
+3. **Refinement is additive** — Never remove original PRD content, only append/strengthen
+4. **Each analyst has a narrow focus** — Don't let them overlap scopes
+5. **Meeseeks chain implies auto-run** — Setting --meeseeks auto-enables --run

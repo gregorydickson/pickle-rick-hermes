@@ -1,142 +1,280 @@
 ---
 name: pickle-rick-dot-patterns
-description: "DOT pipeline pattern reference for pickle-rick-dot. 12 convergence patterns for attractor-compatible graphs. Load on demand — not for direct use."
-version: 0.2.0
+description: "DOT pipeline pattern reference for pickle-rick-dot. 22 convergence patterns across 3 tiers, with permission scoping, defense matrix, and model routing. Load on demand — not for direct use."
+version: 0.3.0
 author: Gal Zahavi (original), Gregory Dickson (Hermes port)
 license: Apache-2.0
 metadata:
   hermes:
-    tags: [patterns, DOT, reference, attractor, convergence]
+    tags: [autonomous, pipeline, DOT, patterns, reference]
     homepage: https://github.com/gregorydickson/pickle-rick-hermes
     related_skills: [pickle-rick-dot, pickle-rick-attract]
 ---
 
-# DOT Pipeline Pattern Reference
+# Pickle Rick DOT Patterns Reference
 
-Load this skill on demand from pickle-rick-dot when generating pipeline graphs.
-Contains the full specification for all convergence patterns.
+Pattern library for pickle-rick-dot. Load this skill when pickle-rick-dot Step 3
+instructs you to read the pattern reference.
+
+## When to Use
+
+- pickle-rick-dot Step 3 tells you to load the pattern reference
+- You need to look up a specific convergence pattern by number
+- You need the anti-patterns list or shapes/conditions reference
+
+Pickle-dot pattern reference. Read by `pickle-dot` on demand — do NOT load this file unless `pickle-dot` instructs you to.
 
 ## Tier 1: Always Emit
 
-### 0. Dependency Setup
-First node. Installs project dependencies.
-```dot
+**0. Dependency Setup** — first node after start. Tool node installs deps in `working_dir`:
+```
 setup_deps [shape=parallelogram, tool_command="cd ${WORKING_DIR} && npm install 2>&1", timeout="120s"]
 start -> setup_deps -> first_impl
 ```
+Detect package manager: `npm install`, `pnpm install`, `yarn install`, `pip install -r requirements.txt`, etc.
 
-### 0b. max_parallel=1
-ALL fan-out nodes MUST use `max_parallel=1`. Parallel processes OOM containers.
+**0b. max_parallel=1** — ALL `shape=component` fan-out nodes MUST use `max_parallel=1`. Parallel agent processes OOM the Docker container (7GB limit).
 
-### 1. Test-Fix Loops
-Every implementation has verification routing back on failure:
-```dot
+**1. Test-Fix Loops** — every impl has verification routing back on failure:
+```
 impl -> test -> check [shape=diamond]
 check -> next [condition="outcome=success", weight=2]
 check -> impl [condition="outcome=fail"]
 ```
 
-### 2. Goal Gates
-P0/critical nodes: `goal_gate=true` + `retry_target`. Use `context_on_success` on final verify:
-```dot
+**2. Goal Gates** — P0/critical nodes get `goal_gate=true`. PRD acceptance criteria → `acceptance_criteria` attr + `goal_gate=true`. Prefer per-node `retry_target`. Context vars: `context.tests_pass`, `context.build_status`, `context.lint_status`, `context.typecheck_status`.
+
+**CRITICAL: `context_on_success` bridge** — every key in `acceptance_criteria` MUST be set by `context_on_success="key=value,key2=value2"` on the final verification tool node. Without this, criteria always fail → infinite retry:
+```
 verify_final [shape=parallelogram,
-    tool_command="cd ${WORKING_DIR} && ${TEST_CMD} 2>&1",
+    tool_command="cd ${WORKING_DIR} && ${LINT_CMD} 2>&1 && ${TYPECHECK_CMD} 2>&1 && ${TEST_CMD} 2>&1",
     goal_gate=true, retry_target="fix_all", max_visits=3,
-    context_on_success="tests_pass=true,lint_status=passing"]
+    context_on_success="tests_pass=true,lint_status=passing,typecheck_status=passing"]
+```
+Do NOT put `context_on_success` on intermediate per-phase verify nodes — those use goal gates for convergence. Only the final verify_final before exit sets acceptance criteria context.
+
+**3. Conditional Routing** — diamond nodes, 2+ edges covering all cases:
+```
+check [shape=diamond]
+check -> a [condition="outcome=success", weight=2]
+check -> b [condition="outcome=fail"]
 ```
 
-### 3. Conditional Routing
-Diamond nodes, 2+ edges covering all cases.
+**6. Max Visits** — `max_visits` on looping nodes prevents infinite convergence.
 
-### 6. Max Visits
-`max_visits` on looping nodes prevents infinite convergence.
-
-### 13. Lint Gate
-Separate tool node BEFORE tests:
-```dot
+**13. Lint Gate** — separate tool node for linter, BEFORE tests:
+```
 verify_lint [shape=parallelogram, tool_command="cd ${WORKING_DIR} && npm run lint 2>&1", max_visits=3]
 ```
+Detect: `npm run lint`, `ruff check .`, `golangci-lint run`. Skip if no linter.
 
-### 14. Type-Check Gate
-After lint, BEFORE tests:
-```dot
+**14. Type-Check Gate** — separate tool node, AFTER lint, BEFORE tests:
+```
 verify_types [shape=parallelogram, tool_command="cd ${WORKING_DIR} && npx tsc --noEmit 2>&1", max_visits=3]
 ```
+Detect: `tsc --noEmit`, `mypy .`, `go vet ./...`. Skip for dynamically-typed projects.
 
-### 21. Cross-Phase Cleanup (fix_all)
-Before verify_final, fixes ALL remaining issues:
-```dot
-fix_all [prompt="Fix ALL remaining issues. Iterate until all pass.", max_visits=5]
+**21. Cross-Phase Cleanup (fix_all)** — before verify_final, fixes ALL remaining issues across all phases:
+```
+fix_all [prompt="Fix ALL remaining issues across the entire codebase. Run each check and fix failures: 1) cd ${WORKING_DIR} && ${LINT_FIX_CMD} 2>&1. 2) ${TYPECHECK_CMD} 2>&1. 3) ${TEST_CMD} 2>&1. Iterate until all pass with zero errors. Do NOT skip or suppress errors.", permission_mode="bypassPermissions", max_visits=5]
+```
+Resolve: `${LINT_FIX_CMD}` = `npx eslint src/ --fix` (Node), `ruff check --fix .` (Python), `golangci-lint run --fix` (Go). `${TYPECHECK_CMD}` = `npx tsc --noEmit` / `mypy .` / `go vet ./...`. `${TEST_CMD}` = `npm test` / `pytest` / `go test ./...`.
+
+Uses Default tier (no `class`). Graph-level and verify_final `retry_target` MUST point to `fix_all`. Single-phase pipelines: still recommended; trivial ones may use sole impl node.
+
+## Tier 2: Default (emit unless explicitly simplified)
+
+**15. Conformance Check** — LLM gate verifying requirements against `$spec_file`. Opus (`.review` class), `goal_gate=true`:
+```
+conformance [class="review", goal_gate=true, retry_target="impl", prompt="Conformance audit: read the spec file at $spec_file. Compare every requirement against the current git diff. Verify: 1) Every requirement has a corresponding code change. 2) Acceptance criteria are testable and tested. 3) No requirements silently dropped. Output PASS or FAIL with unmet requirements."]
+```
+`$spec_file` is interpolated by the engine from the graph-level `spec_file` attribute (like `$goal`).
+
+**16. Spec-First TDD** — write failing tests FROM spec BEFORE impl. Mandatory for `goal_gate=true` impl nodes:
+```
+spec_tests [class="review", prompt="Write failing tests for EVERY requirement. Do NOT write production code.", goal_gate=true, retry_target="spec_tests"]
+impl [prompt="Make all failing tests pass. Do NOT modify test files.", allowed_paths="src/*, tests/*", goal_gate=true, retry_target="impl"]
 ```
 
-## Tier 2: Default
+**16b. BDD Scenario Generation** — behavioral contracts before spec_tests. Emit for phases with 3+ requirements. For 1-2 requirements, spec_tests alone is sufficient:
+```
+bdd_scenarios [class="review", prompt="Read the spec file at $spec_file. For each requirement, generate BDD scenarios in Given/When/Then format. Output as executable test descriptions. Do NOT implement — only define the behavioral contracts."]
+spec_tests [class="review", prompt="Read the BDD scenarios from the previous node's output. Write failing test cases that verify each scenario. Run them to confirm they fail. Do NOT write production code.", goal_gate=true, retry_target="spec_tests"]
+impl [prompt="Make all failing tests pass. Do NOT modify test files.", allowed_paths="src/*", goal_gate=true, retry_target="impl"]
+```
+The BDD node reads `$spec_file`, generates Given/When/Then scenarios. spec_tests converts them to executable tests. impl makes them pass.
 
-### 15. Conformance Check
-LLM gate verifying requirements met. Uses review model.
+**22. Permission Scoping (allowed_paths + escalate_on)** — every codergen (box) impl node declares its file scope:
+```
+impl_auth [prompt="Implement JWT middleware",
+    allowed_paths="src/auth/*, src/middleware/*, tests/auth/*",
+    escalate_on="package.json, package-lock.json, .env*, prisma/schema.prisma"]
+```
+Rules:
+- `allowed_paths`: derive from PRD's affected files/directories. Include source + test dirs. Use globs.
+- `escalate_on`: always include `package.json, package-lock.json, *.lock`, schema files (`*.prisma, *.sql, migrations/*`), config (`.env*, *.config.*`), and auth-related files.
+- If PRD lacks affected-files section → emit `// WARNING: PRD lacks affected-files section` and use broad `allowed_paths="src/*, tests/*"`.
+- Tool nodes (parallelogram) don't need allowed_paths — they run shell commands, not agents.
+- Review/simplify/conformance nodes don't need them — they only read, not write.
 
-### 16. Spec-First TDD
-Write failing tests BEFORE implementation:
-```dot
-spec_tests [class="review", prompt="Write failing tests for EVERY requirement.", goal_gate=true]
-impl [prompt="Make all failing tests pass. Do NOT modify test files.", goal_gate=true]
+**23. Defense Matrix** — comment block at top of every DOT file, after graph attributes:
+```
+// Defense Matrix:
+//   Layer 1 (Competitive):  [YES/NO] — fan-out/fan-in for complex phases
+//   Layer 2 (Guardrails):   YES — lint → typecheck → test → audit
+//   Layer 3 (Spec-Driven):  YES — spec_file, BDD contracts, conformance
+//   Layer 4 (Permissions):  YES — allowed_paths on impl nodes
+//   Layer 5 (Adversarial):  YES — multi-model review, red team, scope check
+```
+Layer 1 = YES when Pattern 18 (competing impls) or Pattern 4 (fan-out) is present. Layer 5 = YES when multi-model review routing or red_team is present. Layers 2-4 are always YES.
+
+**19. Review Convergence Ratchet** — N consecutive clean agent team passes required. Default for all pipelines. Replaces Pattern 7.
+
+Team composition: `correctness` + `patterns` always. Add `architecture` (>5 files), `security` (auth/data), `performance` (hot paths), `api_compatibility` (contracts). Ask user: "Review team? Consecutive passes? (default: 2)"
+
+Each pass = `component→tripleoctagon` fan-out. Pass K failure resets to pass 1. Fix prompts include simplification.
+```
+split_review_N [shape=component, max_parallel=1, join_policy="wait_all", error_policy="continue"]
+reviewer_X_N [class="review", prompt="<narrow focus> ONLY. List issues with file:line."]
+merge_review_N [shape=tripleoctagon, class="review", prompt="Consolidate. BLOCKER or ADVISORY. CLEAN or DIRTY."]
+check_review_N [shape=diamond]
+fix_N [prompt="Fix all BLOCKERs. Also simplify. Do NOT modify test files.", max_visits=5]
+reverify_N [shape=parallelogram, tool_command="cd ${WORKING_DIR} && ..."]
+check_reverify_N [shape=diamond]
+// check_reverify_N -> split_review_1 [condition="outcome=success", weight=2]
+// check_reverify_N -> fix_N [condition="outcome=fail"]
 ```
 
-### 19. Review Convergence Ratchet
-N consecutive clean review passes required. Team: correctness + patterns + optional specialists.
-Each pass = component→tripleoctagon fan-out. Pass K failure resets to pass 1.
+## Tier 3: Conditional (emit when PRD analysis flags them)
 
-## Tier 3: Conditional
-
-### 4. Parallel Fan-Out/In
-For independent workstreams:
-```dot
-split [shape=component, max_parallel=1, join_policy="wait_all"]
+**4. Parallel Fan-Out/Fan-In** — when PRD has independent workstreams:
+```
+split [shape=component, max_parallel=1, join_policy="wait_all", error_policy="continue"]
 merge [shape=tripleoctagon, prompt="Select best"]
 ```
 
-### 8. Security Scanning
-```dot
+**8. Security Scanning** — separate from tests. For projects with security tooling:
+```
 verify_security [shape=parallelogram, tool_command="npm audit --audit-level=high 2>&1"]
 ```
 
-### 9. Coverage Qualification
-Score-based gate (>=80% on new code).
+**9. Coverage Qualification** — score-based gate on new/changed code (>=80%):
+```
+check_coverage [shape=diamond, prompt="Check coverage on new/changed code..."]
+```
 
-### 10. Scope Creep Detection
-Post-implementation review comparing diff against original prompt.
+**10. Scope Creep Detection** — post-implementation, before review. Opus (`.review`):
+```
+scope_check [class="review", prompt="Compare git diff against prompt. Flag out-of-scope changes."]
+```
 
-### 17. Adversarial Red Team
-After conformance. Attempts to break: invalid inputs, races, state corruption.
+**11. Drift Detection** — in review-simplify cycles (Pattern 7 standalone only). Pattern 19 ratchet handles via reset-on-fail.
 
-### 18. Competing Implementations
-Two parallel approaches for high-complexity phases (>3 files).
+**17. Adversarial Red Team** — AFTER conformance. Ask user for security/auth/data phases:
+```
+red_team [class="review", prompt="Attempt to break: invalid inputs, races, exhaustion, state corruption. Write repro tests.", goal_gate=true, retry_target="impl"]
+```
+Note: `retry_target="impl"` is correct here (unlike verify_final) because red_team is mid-pipeline — retry re-enters the full lint→typecheck→test→review ratchet via graph edges. verify_final is the FINAL gate where impl retry can't fix cross-phase issues.
 
-### 20. Microverse Convergence Loop
-For quantitative optimization targets:
-```dot
-baseline -> optimize -> measure -> compare -> check [shape=diamond]
+**18. Competing Implementations** — two parallel approaches for high-complexity phases (>3 files). Ask user:
+```
+split_impl [shape=component, max_parallel=1, join_policy="wait_all", error_policy="continue"]
+approach_minimal [prompt="MINIMAL changes — smallest diff..."]
+approach_clean [prompt="CLEAN architecture — best design..."]
+select_best [shape=tripleoctagon, class="critical", eval_criteria="completeness,faithfulness", eval_threshold=0.7]
+```
+
+**20. Microverse Convergence Loop** — for quantitative targets (metric optimization). Replaces standard impl→verify:
+```
+commit_baseline [shape=parallelogram, tool_command="cd ${WORKING_DIR} && git add -u && git -c user.name=attractor -c user.email=attractor@local commit -m 'microverse: baseline' --allow-empty 2>&1"]
+baseline [shape=parallelogram, tool_command="cd ${WORKING_DIR} && <measurement_cmd> 2>&1"]
+optimize [prompt="Make ONE targeted change toward <TARGET>. Smallest diff.", max_visits=8]
+measure [shape=parallelogram, tool_command="cd ${WORKING_DIR} && <measurement_cmd> 2>&1"]
+compare [class="review", prompt="Compare measurement vs target. MUST output STATUS: marker on its own line — the engine's parseStatusMarker ONLY recognizes: STATUS: SUCCESS (target met), STATUS: PARTIAL_SUCCESS (improved but not at target), STATUS: FAIL (regressed/stalled). Bare words like PASS/FAIL are ignored.", max_visits=10]
+check [shape=diamond]
+rollback [shape=parallelogram, tool_command="cd ${WORKING_DIR} && git checkout . 2>&1"]
+
 check -> next [condition="outcome=success", weight=2]
 check -> optimize [condition="outcome=partial_success"]
 check -> rollback [condition="outcome=fail"]
 rollback -> optimize
 ```
 
-## Superseded Patterns
+## Superseded (reference only)
 
-- Pattern 5 (Human Gates) — NOT IMPLEMENTED for CLI backends
-- Pattern 7 (Review-Simplify) — Superseded by Pattern 19 (ratchet)
-- Pattern 12 (Multi-Pass Complexity) — Superseded by Pattern 18
+**5. Human Gates** — NOT IMPLEMENTED for claude-code backend. Do not emit hexagon nodes.
+
+**7. Review-Simplify Cycle** — superseded by Pattern 19 (ratchet). Standalone fallback only.
+
+**12. Multi-Pass Complexity** — superseded by Pattern 18 (competing impls).
 
 ## Retry Target Scoping
 
-- Graph-level `retry_target` MUST point to `fix_all`
-- Per-node `retry_target` on every `goal_gate=true` node
-- Fan-out branches stay within scope
+- **Graph-level `retry_target` MUST point to `fix_all`** — not setup_deps, not per-phase impl
+- **Per-node `retry_target`** on every `goal_gate=true` node
+- **Fan-out branches stay within scope** — retry only to nodes in the same component→tripleoctagon pair
 
+## Anti-Patterns (NEVER)
 
+- Linear chains without feedback loops
+- `goal_gate=true` without `retry_target`
+- Graph-level `retry_target` to setup_deps/start/per-phase impl (full re-run or scoped-only retry)
+- Fan-out `retry_target` outside branch scope (stripped at runtime — retry is ineffective)
+- `retry_target` inside a fan-out branch pointing before the component node (causes infinite recursion without engine scoping, ineffective with it — retry logic belongs at fan-in or post-merge level)
+- Hexagon nodes (deadlock)
+- Diamond without 2+ edges (stalls)
+- Parallel siblings depending on each other (deadlock)
+- Lint/typecheck/test bundled into one gate
+- Security scanning bundled with tests
+- Conformance skipped
+- Impl before spec tests on critical paths
+- Codergen node without `allowed_paths` (unbounded file scope)
+- `allowed_paths` without test directories (agent can't write tests alongside impl)
+- Missing `spec_file` graph attribute
+- Missing defense matrix comment block
+- Single review pass as final gate (use ratchet)
+- Ratchet fail routing to same pass (defeats consecutive enforcement)
+- Standard impl→verify for metric optimization (use microverse)
+- acceptance_criteria keys without matching `context_on_success`
+- verify_final `retry_target` to per-phase impl (can't fix cross-phase issues)
+- Missing fix_all before verify_final in multi-phase pipelines
+- >4 reviewers per team
 
-## Pitfalls
+## Model Routing
 
-1. **This is a reference, not a command** — Load this skill when building DOT graphs, don't run it
-2. **Match patterns to task type** — Not every PRD needs every convergence pattern
-3. **Node naming conventions** — Use snake_case for node IDs per the examples
+Two tiers: `${DEFAULT_MODEL}` (impl/tools) and `${REVIEW_MODEL}` (review/conformance/red-team).
+
+```dot
+// anthropic (default):
+model_stylesheet = "* { llm_model: claude-sonnet-4-6; } .critical { llm_model: claude-opus-4-6; reasoning_effort: high; } .review { llm_model: claude-opus-4-6; }"
+// single non-anthropic provider:
+model_stylesheet = "* { llm_model: ${DEFAULT}; llm_provider: ${PROVIDER}; } .critical { llm_model: ${REVIEW}; reasoning_effort: high; } .review { llm_model: ${REVIEW}; }"
+// mixed provider (e.g., --provider qwen --review-provider anthropic):
+model_stylesheet = "* { llm_model: qwen-plus; llm_provider: qwen; } .critical { llm_model: claude-opus-4-6; llm_provider: anthropic; reasoning_effort: high; } .review { llm_model: claude-opus-4-6; llm_provider: anthropic; }"
+```
+When `--review-provider` differs from `--provider`, `.review`/`.critical` MUST include `llm_provider` to override `*`. Per-node `llm_model`/`llm_provider` attributes override stylesheet for edge cases.
+
+Provider default table: see **pickle-dot.md Step 1** (single source of truth — do not duplicate here).
+
+## Conditions Reference
+
+`outcome=success`, `outcome=fail`, `outcome=partial_success`, `outcome=retry`, `outcome=skipped`, `context.KEY=VALUE`, combine with `&&`.
+
+## Shapes Reference
+
+Mdiamond=start, Msquare=exit, box=codergen, diamond=conditional, component=fan-out, tripleoctagon=fan-in, parallelogram=tool, house=manager_loop. (hexagon=human — NOT IMPLEMENTED)
+
+Permission modes: `plan` (default), `bypassPermissions`, `acceptEdits`, `auto`, `default`, `dontAsk`. NOT `full`.
+
+## Graph Attributes Reference
+
+| Attribute | Scope | Description |
+|-----------|-------|-------------|
+| `spec_file` | graph | Path to PRD inside workspace. Engine interpolates `$spec_file` in prompts. |
+| `allowed_paths` | node (codergen) | Glob patterns for files the agent can write. Comma-separated. |
+| `escalate_on` | node (codergen) | File patterns that trigger escalation review. Comma-separated. |
+
+## DOT Schema
+
+Full schema: `attractor/DOT_SCHEMA.md`. Key tool attribute: `context_on_success` (sets RunContext keys on exit 0).
+
