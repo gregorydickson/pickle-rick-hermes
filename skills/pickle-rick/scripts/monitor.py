@@ -40,6 +40,66 @@ def format_time(seconds: int) -> str:
     return f"{m}m{s:02d}s"
 
 
+def sparkline(values: list) -> str:
+    """Unicode sparkline from a sequence of numbers (ported from CL monitor.js)."""
+    if not values:
+        return ''
+    blocks = '▁▂▃▄▅▆▇█'
+    min_val = min(values)
+    max_val = max(values)
+    range_val = max_val - min_val or 1
+    return ''.join(
+        blocks[min(len(blocks) - 1, round(((v - min_val) / range_val) * (len(blocks) - 1)))]
+        for v in values
+    )
+
+
+def render_microverse_trend(mv: dict, width: int) -> list:
+    """Render compact microverse convergence trend section with sparkline."""
+    out = []
+    sep = f"{MX.DIM}{'─' * width}{MX.R}"
+    history = mv.get('convergence', {}).get('history', [])
+    direction = mv.get('key_metric', {}).get('direction', 'higher')
+    target_label = str(mv.get('convergence_target', '—'))
+
+    out.append(f'\n{sep}\n{MX.BRIGHT}Metric Trend{MX.R} {MX.DIM}({direction} is better, target: {target_label}){MX.R}\n')
+
+    if not history:
+        out.append(f'  {MX.DIM}No measurements yet{MX.R}\n')
+        return out
+
+    scores = [h['score'] for h in history]
+    spark = sparkline(scores)
+    latest = scores[-1]
+    latest_action = history[-1].get('action', 'accept')
+    latest_color = MX.GREEN if latest_action == 'accept' else MX.ERR
+
+    out.append(f'  {MX.DIM}Score:{MX.R} {latest_color}{latest}{MX.R}  {MX.GREEN}{spark}{MX.R}\n')
+
+    tail = history[-8:]  # Last 8 entries
+    entries = []
+    for h in tail:
+        sym = '✓' if h.get('action') == 'accept' else '✗'
+        color = MX.GREEN if h.get('action') == 'accept' else MX.ERR
+        entries.append(f"{color}{h['iteration']}:{h['score']}{sym}{MX.R}")
+    out.append(f'  {" ".join(entries)}\n')
+
+    stall_counter = mv.get('convergence', {}).get('stall_counter', 0)
+    stall_limit = mv.get('convergence', {}).get('stall_limit', 5)
+    if stall_counter > 0:
+        stall_color = MX.ERR if stall_counter >= stall_limit - 1 else MX.WARN
+        out.append(f'  {stall_color}Stall: {stall_counter}/{stall_limit}{MX.R}\n')
+
+    status = mv.get('status', 'unknown')
+    if status == 'converged':
+        out.append(f'  {MX.BRIGHT}{MX.GREEN}◆ CONVERGED{MX.R}\n')
+    elif status == 'stopped':
+        reason = mv.get('exit_reason', '')
+        out.append(f'  {MX.WARN}◇ STOPPED ({reason}){MX.R}\n')
+
+    return out
+
+
 def status_symbol(status: str) -> str:
     s = (status or '').lower()
     if s == 'done':
@@ -166,17 +226,22 @@ def render(session_dir: Path) -> bool:
         except (json.JSONDecodeError, OSError):
             pass
     
-    # Microverse state
+    # Microverse state with sparkline trend
     mv_path = session_dir / 'microverse.json'
     if mv_path.exists():
         try:
             mv = json.loads(mv_path.read_text())
-            status = mv.get('status', '?')
-            stall = mv.get('convergence', {}).get('stall_counter', 0)
-            limit = mv.get('convergence', {}).get('stall_limit', 5)
-            history = mv.get('convergence', {}).get('history', [])
-            best = max((h['score'] for h in history if h.get('action') == 'accept'), default=0)
-            fields.append(('Microverse', f"{MX.CYAN}{status} | stall {stall}/{limit} | best {best}{MX.R}"))
+            # Use new detailed trend rendering when in microverse/szechuan mode
+            if mv.get('convergence', {}).get('history'):
+                out.extend(render_microverse_trend(mv, width))
+            else:
+                # Fallback to compact one-liner
+                status = mv.get('status', '?')
+                stall = mv.get('convergence', {}).get('stall_counter', 0)
+                limit = mv.get('convergence', {}).get('stall_limit', 5)
+                history = mv.get('convergence', {}).get('history', [])
+                best = max((h['score'] for h in history if h.get('action') == 'accept'), default=0)
+                fields.append(('Microverse', f"{MX.CYAN}{status} | stall {stall}/{limit} | best {best}{MX.R}"))
         except (json.JSONDecodeError, OSError):
             pass
     

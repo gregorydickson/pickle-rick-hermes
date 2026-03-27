@@ -109,21 +109,73 @@ def log_activity(session_dir: Path, event: str, **kwargs) -> None:
         f.write(json.dumps(entry) + '\n')
 
 
+def extract_assistant_content(output: str) -> str:
+    """
+    Extract text content from assistant messages in stream-json output.
+    Filters out tool_result / user / system lines so that promise tokens
+    embedded in reviewed source code do not cause false matches.
+
+    Ported from pickle-rick-claude v1.28.0 mux-runner.js.
+    """
+    lines = output.split('\n')
+    # First pass: detect stream-json mode
+    is_stream_json = False
+    for line in lines:
+        if not line.strip():
+            continue
+        try:
+            json.loads(line)
+            is_stream_json = True
+            break
+        except json.JSONDecodeError:
+            pass
+
+    parts = []
+    for line in lines:
+        if not line.strip():
+            continue
+        try:
+            parsed = json.loads(line)
+            if parsed.get('type') == 'assistant':
+                content = parsed.get('message', {}).get('content', [])
+                if isinstance(content, list):
+                    for block in content:
+                        if block.get('type') == 'text' and isinstance(block.get('text'), str):
+                            parts.append(block['text'])
+                elif isinstance(content, str):
+                    parts.append(content)
+            elif parsed.get('type') == 'result' and isinstance(parsed.get('result'), str):
+                parts.append(parsed['result'])
+            # Skip: user (tool_result), system, tool_use
+        except json.JSONDecodeError:
+            # Non-JSON line: only include in pure plain-text mode
+            if not is_stream_json:
+                parts.append(line)
+
+    return '\n'.join(parts)
+
+
 def classify_output(output: str) -> str:
-    """Classify iteration output by checking for signal tokens."""
-    if SIGNAL_TOKENS['EPIC_COMPLETED'] in output:
+    """
+    Classify iteration output by checking for signal tokens in assistant content only.
+    This prevents false positives from promise tokens in reviewed source code.
+
+    Ported from pickle-rick-claude v1.28.0 mux-runner.js.
+    """
+    content = extract_assistant_content(output)
+    if SIGNAL_TOKENS['EPIC_COMPLETED'] in content:
         return 'epic_completed'
-    if SIGNAL_TOKENS['EXISTENCE_IS_PAIN'] in output:
+    if SIGNAL_TOKENS['EXISTENCE_IS_PAIN'] in content:
         return 'review_clean'
-    if SIGNAL_TOKENS['THE_CITADEL_APPROVES'] in output:
+    if SIGNAL_TOKENS['THE_CITADEL_APPROVES'] in content:
         return 'review_clean'
-    if SIGNAL_TOKENS['TASK_COMPLETED'] in output:
+    if SIGNAL_TOKENS['TASK_COMPLETED'] in content:
         return 'task_completed'
-    if SIGNAL_TOKENS['PRD_COMPLETE'] in output:
+    if SIGNAL_TOKENS['PRD_COMPLETE'] in content:
         return 'prd_complete'
-    if SIGNAL_TOKENS['TICKET_SELECTED'] in output:
+    if SIGNAL_TOKENS['TICKET_SELECTED'] in content:
         return 'ticket_selected'
-    if SIGNAL_TOKENS['BLOCKED'] in output:
+    if SIGNAL_TOKENS['BLOCKED'] in content:
         return 'blocked'
     return 'continue'
 
@@ -139,6 +191,30 @@ def detect_rate_limit(output: str) -> bool:
     ]
     lower = output.lower()
     return any(re.search(p, lower) for p in patterns)
+
+
+def strip_setup_section(prompt: str) -> str:
+    """
+    Strip the Setup section from dual-mode templates (e.g. meeseeks.md, szechuan-sauce.md).
+    The mux-runner always invokes with --resume, so Setup instructions are dead weight.
+
+    Ported from pickle-rick-claude v1.28.0 mux-runner.js.
+    """
+    import re
+    setup_re = re.compile(r'^## SETUP(?: MODE)?$', re.MULTILINE)
+    setup_match = setup_re.search(prompt)
+    if not setup_match:
+        return prompt
+
+    # Find the next ##-level heading after the setup section
+    after_setup = prompt[setup_match.end():]
+    next_heading_re = re.compile(r'^## \S', re.MULTILINE)
+    next_match = next_heading_re.search(after_setup)
+    if not next_match:
+        return prompt  # Setup is last section
+
+    end_index = setup_match.end() + next_match.start()
+    return prompt[:setup_match.start()] + prompt[end_index:]
 
 
 def build_handoff(state: dict, session_dir: Path, iteration: int) -> str:
@@ -410,9 +486,33 @@ IMPORTANT: Work in {state['working_dir']}. NEVER fix code directly — write dir
     return prompt
 
 
+def load_skill_prompt(command: str) -> str:
+    """Load a skill prompt by name (e.g., 'szechuan-sauce', 'anatomy-park')."""
+    skill_paths = [
+        SCRIPTS_DIR.parent / f'pickle-rick-{command}' / 'SKILL.md',
+        Path.home() / '.hermes' / 'skills' / f'pickle-rick-{command}' / 'SKILL.md',
+        SCRIPTS_DIR.parent / f'{command}' / 'SKILL.md',
+    ]
+    for p in skill_paths:
+        try:
+            content = p.read_text()
+            # Strip YAML frontmatter and SETUP section
+            # Remove frontmatter
+            if content.startswith('---'):
+                end = content.find('---', 3)
+                if end > 0:
+                    content = content[end + 3:]
+            # Strip SETUP section
+            return strip_setup_section(content)
+        except OSError:
+            continue
+    return None
+
+
 def build_prompt(state: dict, session_dir: Path, iteration: int) -> str:
     """Build the full prompt for a hermes iteration (mode-aware)."""
     mode = state.get('mode', 'pickle')
+    command_template = state.get('command_template')
 
     # Meeseeks mode: use single-pass review prompt
     if mode == 'meeseeks':
@@ -422,10 +522,19 @@ def build_prompt(state: dict, session_dir: Path, iteration: int) -> str:
     if mode == 'council':
         return build_council_prompt(state, session_dir, iteration)
 
+    # If a specific command template is specified, load its WORKER MODE section
+    if command_template:
+        skill_prompt = load_skill_prompt(command_template)
+        if skill_prompt:
+            handoff = build_handoff(state, session_dir, iteration)
+            # Add resume trigger and handoff to skill prompt
+            return f"""{skill_prompt}\n\n## Session Resume Trigger\n\nUser input contains `--resume {session_dir}`\n\n{handoff}\n\nBEGIN WORKER MODE NOW. DO NOT output setup instructions.
+"""
+
     # Default pickle mode
     handoff = build_handoff(state, session_dir, iteration)
     persona = load_persona()
-    
+
     prompt = f"""You are running the Pickle Rick autonomous engineering loop.
 
 {persona}
