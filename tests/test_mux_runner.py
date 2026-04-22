@@ -12,6 +12,7 @@ from mux_runner import (
     SIGNAL_TOKENS, classify_output, detect_rate_limit,
     build_handoff, build_prompt, load_persona,
     read_state, write_state, log_activity,
+    has_lifecycle_artifact, classify_ticket_completion,
 )
 
 
@@ -163,6 +164,71 @@ class TestPersona:
         (session / 'state.json').write_text(__import__('json').dumps(state))
         prompt = build_prompt(state, session, 0)
         assert 'Pickle Rick autonomous engineering loop' in prompt
+
+
+class TestGhostTicketPrevention:
+    def test_token_present_returns_completed(self, tmp_path):
+        log = tmp_path / 'iter.log'
+        log.write_text('some output\n[TASK_COMPLETED]\n')
+        assert classify_ticket_completion(log, str(tmp_path), tmp_path) == 'completed'
+
+    def test_no_artifact_returns_skipped(self, tmp_path):
+        log = tmp_path / 'iter.log'
+        log.write_text('some output\n')
+        assert classify_ticket_completion(log, str(tmp_path), tmp_path) == 'skipped'
+
+    def test_implementation_artifact_returns_completed(self, tmp_path):
+        log = tmp_path / 'iter.log'
+        log.write_text('some output\n')
+        (tmp_path / 'research_notes.md').write_text('notes')
+        assert classify_ticket_completion(log, str(tmp_path), tmp_path, 'implementation') == 'completed'
+
+    def test_review_artifact_returns_completed(self, tmp_path):
+        log = tmp_path / 'iter.log'
+        log.write_text('some output\n')
+        (tmp_path / 'review_scope.md').write_text('scope')
+        assert classify_ticket_completion(log, str(tmp_path), tmp_path, 'review') == 'completed'
+
+    def test_git_diff_corroboration(self, tmp_git_repo):
+        log = tmp_git_repo / 'iter.log'
+        log.write_text('some output\n')
+        # Artifact exists; git diff corroboration is attempted
+        (tmp_git_repo / 'new_file.txt').write_text('new content')
+        ticket_dir = tmp_git_repo / 'tickets' / 'abc123'
+        ticket_dir.mkdir(parents=True)
+        (ticket_dir / 'research_notes.md').write_text('notes')
+        assert classify_ticket_completion(log, str(tmp_git_repo), ticket_dir, 'implementation') == 'completed'
+
+    def test_missing_ticket_dir_returns_skipped(self, tmp_path):
+        log = tmp_path / 'iter.log'
+        log.write_text('some output\n')
+        assert classify_ticket_completion(log, str(tmp_path), tmp_path / 'nonexistent') == 'skipped'
+
+    def test_has_lifecycle_artifact_implementation(self):
+        assert has_lifecycle_artifact(['research_notes.md', 'plan.md'], 'implementation') is True
+        assert has_lifecycle_artifact(['random.txt'], 'implementation') is False
+
+    def test_has_lifecycle_artifact_review(self):
+        assert has_lifecycle_artifact(['review_scope.md'], 'review') is True
+        assert has_lifecycle_artifact(['research_notes.md'], 'review') is False
+
+    def test_classify_fails_safe_on_exception(self, tmp_path):
+        # Pass a directory as iter_log_file to trigger OSError on read_text
+        assert classify_ticket_completion(tmp_path, str(tmp_path), tmp_path) == 'skipped'
+
+    def test_classify_ticket_completion_git_permission_error(self, tmp_path, monkeypatch):
+        """Simulate PermissionError from subprocess.run (e.g. git not executable)."""
+        import subprocess
+        log = tmp_path / 'iter.log'
+        log.write_text('some output\n')
+        (tmp_path / 'research_notes.md').write_text('notes')
+        
+        def mock_run(*args, **kwargs):
+            raise PermissionError(13, 'Permission denied')
+        monkeypatch.setattr(subprocess, 'run', mock_run)
+        
+        # Should still return 'completed' because artifact exists
+        assert classify_ticket_completion(log, str(tmp_path), tmp_path) == 'completed'
 
 
 class TestLogActivity:

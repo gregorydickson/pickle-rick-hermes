@@ -43,10 +43,11 @@ Extract flags from user input (`--resume <path>`, `--max-iterations <N>`, etc.).
 python3 ~/.hermes/skills/autonomous-ai-agents/pickle-rick/scripts/pickle_state.py init --tmux <FLAGS> --task "<TASK_TEXT>"
 ```
 No flags: `pickle_state.py init --tmux --task "user input"`.
-Resume example: `pickle_state.py init --tmux --resume /sessions/057f0263` (no --task needed).
 Flags+task example: `pickle_state.py init --tmux --max-iterations 10 --task "refactor auth"`
 
 Extract `SESSION_ROOT=<path>` and `working_dir` from output.
+
+To resume an existing session, skip init and pass `--resume <SESSION_ROOT>` directly to the runner (e.g. `mux_runner.py --resume <SESSION_ROOT>`).
 
 ## Step 3: tmux Session
 Session name: `pickle-<hash>` from SESSION_ROOT basename.

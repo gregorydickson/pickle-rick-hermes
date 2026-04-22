@@ -44,6 +44,7 @@ import subprocess
 import sys
 import time
 from pathlib import Path
+from typing import Optional
 
 # Add scripts dir to path for imports
 SCRIPTS_DIR = Path(__file__).parent
@@ -217,8 +218,70 @@ def strip_setup_section(prompt: str) -> str:
     return prompt[:setup_match.start()] + prompt[end_index:]
 
 
+# ---------------------------------------------------------------------------
+# Ghost-ticket prevention: role-aware artifact classifier
+# Ported from pickle-rick-claude v1.44.2 mux-runner.js (commit 48ea2c9)
+# ---------------------------------------------------------------------------
+
+ARTIFACT_PREFIXES = {
+    'implementation': ['research_', 'plan_', 'conformance_', 'code_review_'],
+    'review': ['review_scope.md', 'review_findings.md', 'spec_conformance.md'],
+}
+
+
+def has_lifecycle_artifact(files: list, role: str = 'implementation') -> bool:
+    """Check if any file in the list matches role-specific artifact prefixes."""
+    prefixes = ARTIFACT_PREFIXES.get(role, ARTIFACT_PREFIXES['implementation'])
+    for f in files:
+        for prefix in prefixes:
+            if f.startswith(prefix):
+                return True
+    return False
+
+
+def classify_ticket_completion(iter_log_file: Path, working_dir: str,
+                                ticket_dir: Optional[Path], role: str = 'implementation') -> str:
+    """
+    Post-hoc safety net: validates whether a ticket was actually completed
+    before marking it Done. TASK_COMPLETED token is strong evidence. Otherwise
+    require a ticket-scoped lifecycle artifact.
+    Never throws — fails safe to 'skipped'.
+    """
+    try:
+        log_content = iter_log_file.read_text()
+        assistant_content = extract_assistant_content(log_content)
+        if SIGNAL_TOKENS['TASK_COMPLETED'] in assistant_content:
+            return 'completed'
+    except OSError:
+        pass
+    if not ticket_dir or not ticket_dir.exists():
+        return 'skipped'
+    try:
+        files = os.listdir(ticket_dir)
+    except OSError:
+        return 'skipped'
+    if not has_lifecycle_artifact(files, role):
+        return 'skipped'
+    # Artifact exists — corroborate with git diff
+    try:
+        result = subprocess.run(
+            ['git', 'diff', '--stat'],
+            cwd=working_dir, capture_output=True, text=True, timeout=30
+        )
+        if result.stdout.strip():
+            return 'completed'
+        result = subprocess.run(
+            ['git', 'diff', '--cached', '--stat'],
+            cwd=working_dir, capture_output=True, text=True, timeout=30
+        )
+        if result.stdout.strip():
+            return 'completed'
+    except (subprocess.TimeoutExpired, OSError):
+        pass
+    return 'completed'
+
+
 def build_handoff(state: dict, session_dir: Path, iteration: int) -> str:
-    """Build handoff context for the next iteration."""
     lines = [
         f"# Handoff — Iteration {iteration}",
         f"",
@@ -759,6 +822,25 @@ def main():
         
         # Classify output
         classification = classify_output(output)
+        
+        # Ghost-ticket validation: corroborate task_completed with artifacts
+        if classification == 'task_completed':
+            iter_log_file = session_dir / f'iteration_{iteration}.log'
+            current_ticket = state.get('current_ticket')
+            ticket_dir = None
+            if current_ticket:
+                ticket_dir = session_dir / 'tickets' / current_ticket
+            # Derive role from current mode (review modes use review artifacts)
+            role = 'review' if state.get('mode') in ('meeseeks', 'council') else 'implementation'
+            verdict = classify_ticket_completion(
+                iter_log_file, state['working_dir'], ticket_dir, role
+            )
+            if verdict != 'completed':
+                print(f"  WARNING: Ghost ticket detected \u2014 TASK_COMPLETED but no artifacts. Downgrading to 'continue'.")
+                log_activity(session_dir, 'ghost_ticket_detected', iteration=iteration,
+                             ticket=current_ticket, role=role)
+                classification = 'continue'
+        
         print(f"  Result: {classification}")
         
         # Check for rate limits
