@@ -64,53 +64,49 @@ Otherwise:
 
 ### New Session
 ```bash
-python3 ~/.hermes/skills/autonomous-ai-agents/pickle-rick/scripts/setup.js" --command-template microverse.md --tmux [--max-iterations <N>] --task "<TASK_TEXT>"
+python3 ~/.hermes/skills/autonomous-ai-agents/pickle-rick/scripts/pickle_state.py init --tmux --mode microverse --command-template microverse [--max-iterations <N>] --task "<TASK_TEXT>"
 ```
 If `--interactive` flag was passed, omit `--tmux` from the init call.
 
 ### Resume
-```bash
-python3 ~/.hermes/skills/autonomous-ai-agents/pickle-rick/scripts/setup.js" --command-template microverse.md --resume [<PATH>] --tmux [--max-iterations <N>]
-```
-If `--interactive` flag was passed, omit `--tmux` from the init call.
-
-Extract `SESSION_ROOT=<path>` from output. If `--resume`, skip Steps 3 and 4.
+For resume, pass the existing SESSION_ROOT to the runner directly (no init needed). If `--interactive` flag was passed, run microverse_runner.py inline instead of tmux.
 
 ## Step 3: Create microverse.json (new sessions only)
 
 Write `${SESSION_ROOT}/microverse.json` conforming to `MicroverseSessionState`:
 
 ```bash
-node -e "
-const fs = require('fs');
-const path = require('path');
-const sessionDir = process.argv[1];
-const type = process.argv[6] || 'command';
-const direction = process.argv[7] || 'higher';
-const keyMetric = {
-  description: process.argv[2],
-  validation: process.argv[3],
-  type: type,
-  timeout_seconds: 60,
-  tolerance: Number(process.argv[4]),
-  direction: direction
-};
-if (type === 'llm') keyMetric.judge_model = process.argv[8] || 'claude-sonnet-4-6';
-const state = {
-  status: 'gap_analysis',
-  prd_path: path.join(sessionDir, 'prd.md'),
-  key_metric: keyMetric,
-  convergence: {
-    stall_limit: Number(process.argv[5]),
-    stall_counter: 0,
-    history: []
-  },
-  gap_analysis_path: '',
-  failed_approaches: [],
-  baseline_score: 0
-};
-fs.writeFileSync(path.join(sessionDir, 'microverse.json'), JSON.stringify(state, null, 2));
-console.log('microverse.json created');
+python3 -c "
+import json, sys, os
+session_dir = sys.argv[1]
+metric_type = sys.argv[6] if len(sys.argv) > 6 else 'command'
+direction = sys.argv[7] if len(sys.argv) > 7 else 'higher'
+key_metric = {
+    'description': sys.argv[2],
+    'validation': sys.argv[3],
+    'type': metric_type,
+    'timeout_seconds': 60,
+    'tolerance': float(sys.argv[4]),
+    'direction': direction
+}
+if metric_type == 'llm':
+    key_metric['judge_model'] = sys.argv[8] if len(sys.argv) > 8 else 'claude-sonnet-4-6'
+state = {
+    'status': 'gap_analysis',
+    'prd_path': os.path.join(session_dir, 'prd.md'),
+    'key_metric': key_metric,
+    'convergence': {
+        'stall_limit': int(sys.argv[5]),
+        'stall_counter': 0,
+        'history': []
+    },
+    'gap_analysis_path': '',
+    'failed_approaches': [],
+    'baseline_score': 0
+}
+with open(os.path.join(session_dir, 'microverse.json'), 'w') as f:
+    json.dump(state, f, indent=2)
+print('microverse.json created')
 " "${SESSION_ROOT}" "<TASK_TEXT>" "<VALIDATION>" "<TOLERANCE>" "<STALL_LIMIT>" "<TYPE>" "<DIRECTION>" "<JUDGE_MODEL>"
 ```
 
@@ -120,7 +116,7 @@ Replace placeholders with parsed values:
 - `<DIRECTION>` = from `--direction` flag (default `higher`)
 - `<JUDGE_MODEL>` = from `--judge-model` flag (default `claude-sonnet-4-6`, only used when type=`llm`)
 
-Verify: `node -e "const s=JSON.parse(require('fs').readFileSync('${SESSION_ROOT}/microverse.json','utf-8')); console.log('status:', s.status, 'metric:', s.key_metric.validation, 'stall_limit:', s.convergence.stall_limit)"`
+Verify: `python3 -c "import json; s=json.load(open('${SESSION_ROOT}/microverse.json')); print('status:', s['status'], 'metric:', s['key_metric']['validation'], 'stall_limit:', s['convergence']['stall_limit'])"`
 
 ## Step 4: Write prd.md (new sessions only)
 
@@ -169,15 +165,15 @@ Print attach command: `tmux attach -t <name>`
 
 5. Launch runner:
 ```bash
-tmux send-keys -t <name>:0 "python3 ~/.hermes/skills/autonomous-ai-agents/pickle-rick/scripts/microverse-runner.js ${SESSION_ROOT}; echo ''; echo 'Microverse runner finished.  Ctrl+B 1 → monitor  |  Ctrl+B D → detach'; read" Enter
+tmux send-keys -t <name>:0 "python3 ~/.hermes/skills/autonomous-ai-agents/pickle-rick/scripts/microverse_runner.py --resume <SESSION_ROOT>; echo ''; echo 'Microverse runner finished.  Ctrl+B 1 → monitor  |  Ctrl+B D → detach'; read" Enter
 ```
 
 6. Launch monitor:
 ```bash
-bash ~/.hermes/skills/autonomous-ai-agents/pickle-rick/scripts/tmux-monitor.sh" <name> ${SESSION_ROOT} pickle
+bash ~/.hermes/skills/autonomous-ai-agents/pickle-rick/scripts/tmux-monitor.sh <name> ${SESSION_ROOT} microverse
 ```
 
-7. Report: session name, `tmux attach -t <name>`, window layout (monitor: Ctrl+B 1; runner: Ctrl+B 0), cancel: `cd <working_dir> && eat-pickle`, emergency: `tmux kill-session -t <name>`, state path.
+7. Report: session name, `tmux attach -t <name>`, window layout (monitor: Ctrl+B 1; runner: Ctrl+B 0), cancel: `python3 ~/.hermes/skills/autonomous-ai-agents/pickle-rick/scripts/pickle_utils.py cancel --session <SESSION_ROOT>` (graceful), emergency: `tmux kill-session -t <name>`, state path.
 
 Output: `[TASK_COMPLETED]`
 

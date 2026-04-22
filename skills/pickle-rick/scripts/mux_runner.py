@@ -715,6 +715,7 @@ def main():
     start_time = state.get('start_time_epoch', int(time.time()))
     max_time_seconds = state.get('max_time_minutes', args.max_time) * 60
     consecutive_rate_limits = 0
+    exit_reason = None
     
     mode = state.get('mode', 'pickle')
     mode_label = {'pickle': 'Pickle Rick', 'meeseeks': 'Mr. Meeseeks Review',
@@ -735,11 +736,13 @@ def main():
         # Check limits
         if iteration >= state['max_iterations']:
             print(f"\nMax iterations reached ({iteration})")
+            exit_reason = 'max_iterations'
             break
         
         elapsed = int(time.time()) - start_time
         if elapsed >= max_time_seconds:
             print(f"\nTime limit reached ({elapsed // 60}m)")
+            exit_reason = 'time_limit'
             break
         
         # Check circuit breaker
@@ -747,6 +750,7 @@ def main():
             status = cb.get_status()
             print(f"\nCircuit breaker OPEN: {status['reason']}")
             log_activity(session_dir, 'circuit_open', reason=status['reason'])
+            exit_reason = 'circuit_open'
             break
         
         # Run iteration
@@ -763,6 +767,7 @@ def main():
             if consecutive_rate_limits >= MAX_RATE_LIMIT_RETRIES:
                 print(f"\nRate limit reached {consecutive_rate_limits} times. Stopping.")
                 log_activity(session_dir, 'rate_limit_exhausted')
+                exit_reason = 'rate_limit_exhausted'
                 break
             wait_time = RATE_LIMIT_WAIT_MINUTES * 60
             print(f"  Rate limited. Waiting {RATE_LIMIT_WAIT_MINUTES}m (attempt {consecutive_rate_limits}/{MAX_RATE_LIMIT_RETRIES})")
@@ -782,6 +787,7 @@ def main():
             )
             if cb_state == 'OPEN':
                 print(f"\nCircuit breaker tripped: {cb.get_status()['reason']}")
+                exit_reason = 'circuit_open'
                 break
         
         # Handle classification
@@ -816,6 +822,7 @@ def main():
             print(f"  Duration: {elapsed // 60}m {elapsed % 60}s")
             print(f"{'=' * 60}")
             log_activity(session_dir, 'epic_completed')
+            exit_reason = 'epic_completed'
             break
         
         if classification == 'review_clean':
@@ -838,12 +845,14 @@ def main():
                     print(f"  Min iterations met ({cur_iter} >= {min_iter}).")
                 print(f"  Mr. Meeseeks has ceased to exist! Look at how clean this code is!")
                 log_activity(session_dir, 'review_complete', iteration=iteration)
+                exit_reason = 'review_complete'
                 break
         
         if classification == 'blocked':
             print(f"\n  Worker is BLOCKED. Check iteration log for details.")
             print(f"  Log: {session_dir}/iteration_{iteration}.log")
             log_activity(session_dir, 'blocked', iteration=iteration)
+            exit_reason = 'blocked'
             break
         
         # Increment iteration
@@ -866,10 +875,18 @@ def main():
     except (json.JSONDecodeError, OSError):
         pass
     
+    if shutdown and exit_reason is None:
+        exit_reason = 'shutdown'
+    
     elapsed = int(time.time()) - start_time
-    log_activity(session_dir, 'session_end', duration_min=round(elapsed / 60))
+    log_activity(session_dir, 'session_end', duration_min=round(elapsed / 60), exit_reason=exit_reason)
     print(f"\nSession ended. Duration: {elapsed // 60}m {elapsed % 60}s")
     print(f"Session dir: {session_dir}")
+    
+    # Explicit exit code so parent processes can detect failure.
+    is_failed_exit = exit_reason in ('circuit_open', 'rate_limit_exhausted',
+                                      'max_iterations', 'time_limit', 'blocked', 'shutdown')
+    sys.exit(1 if is_failed_exit else 0)
 
 
 if __name__ == '__main__':

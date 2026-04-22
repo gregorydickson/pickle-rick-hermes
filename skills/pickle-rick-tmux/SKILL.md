@@ -40,7 +40,7 @@ Run `tmux -V`. If missing: "Install tmux: `brew install tmux` or `apt install tm
 Extract flags from user input (`--resume <path>`, `--max-iterations <N>`, etc.). Pass flags before `--task`. Task text goes in `--task "..."`.
 
 ```bash
-python3 ~/.hermes/skills/autonomous-ai-agents/pickle-rick/scripts/setup.js" --tmux <FLAGS> --task "<TASK_TEXT>"
+python3 ~/.hermes/skills/autonomous-ai-agents/pickle-rick/scripts/pickle_state.py init --tmux <FLAGS> --task "<TASK_TEXT>"
 ```
 No flags: `pickle_state.py init --tmux --task "user input"`.
 Resume example: `pickle_state.py init --tmux --resume /sessions/057f0263` (no --task needed).
@@ -58,16 +58,16 @@ Print attach command immediately: `tmux attach -t <name>` (Window 1 "monitor" = 
 
 ## Step 4: Launch Runner
 ```bash
-tmux send-keys -t <name>:0 "python3 ~/.hermes/skills/autonomous-ai-agents/pickle-rick/scripts/mux-runner.js <SESSION_ROOT>; echo ''; echo 'Runner finished.  Ctrl+B 1 → monitor  |  Ctrl+B D → detach'; read" Enter
+tmux send-keys -t <name>:0 "python3 ~/.hermes/skills/autonomous-ai-agents/pickle-rick/scripts/mux_runner.py --resume <SESSION_ROOT>; echo ''; echo 'Runner finished.  Ctrl+B 1 → monitor  |  Ctrl+B D → detach'; read" Enter
 ```
 
 ## Step 5: Monitor (4-pane)
 ```bash
-bash ~/.hermes/skills/autonomous-ai-agents/pickle-rick/scripts/tmux-monitor.sh" <name> <SESSION_ROOT> pickle
+bash ~/.hermes/skills/autonomous-ai-agents/pickle-rick/scripts/tmux-monitor.sh <name> <SESSION_ROOT> pickle
 ```
 
 ## Step 6: Report
-Print: session name, `tmux attach -t <name>`, window layout (monitor: dashboard top-left / log-stream top-right / morty-logs bottom-left / raw-morty bottom-right; runner: Ctrl+B 0), cancel: `cd <working_dir> && eat-pickle`, emergency: `tmux kill-session -t <name>` then `python3 ~/.hermes/skills/autonomous-ai-agents/pickle-rick/scripts/cancel.js`, state path: `<SESSION_ROOT>/state.json`.
+Print: session name, `tmux attach -t <name>`, window layout (monitor: dashboard top-left / log-stream top-right / morty-logs bottom-left / raw-morty bottom-right; runner: Ctrl+B 0), cancel: `python3 ~/.hermes/skills/autonomous-ai-agents/pickle-rick/scripts/pickle_utils.py cancel --session <SESSION_ROOT>` (graceful), emergency: `tmux kill-session -t <name>` then `python3 ~/.hermes/skills/autonomous-ai-agents/pickle-rick/scripts/pickle_utils.py cancel --session <SESSION_ROOT>`, state path: `<SESSION_ROOT>/state.json`.
 
 Output: `[TASK_COMPLETED]`
 

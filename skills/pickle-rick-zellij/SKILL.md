@@ -61,7 +61,7 @@ If `$ZELLIJ` env var is set, warn: "Nested Zellij session detected — this may 
 Extract flags from user input (`--resume <path>`, `--max-iterations <N>`, etc.). Pass flags before `--task`. Task text goes in `--task "..."`.
 
 ```bash
-python3 ~/.hermes/skills/autonomous-ai-agents/pickle-rick/scripts/setup.js" --tmux <FLAGS> --task "<TASK_TEXT>"
+python3 ~/.hermes/skills/autonomous-ai-agents/pickle-rick/scripts/pickle_state.py init --tmux <FLAGS> --task "<TASK_TEXT>"
 ```
 No flags: `pickle_state.py init --tmux --task "user input"`.
 Resume example: `pickle_state.py init --tmux --resume /sessions/057f0263` (no --task needed).
@@ -112,7 +112,7 @@ The KDL layout (`monitor-pickle.kdl`) creates both tabs automatically:
 - **monitor** tab (focused): dashboard top-left, log-stream top-right, morty-watcher bottom
 
 ## Step 4: Report
-Print: session name, `zellij attach pickle-<hash>`, tab layout (monitor: dashboard top-left / log-stream top-right / morty-logs bottom; runner: switch tabs with Zellij keybinds), cancel: `cd <working_dir> && eat-pickle` (graceful), emergency: `zellij delete-session pickle-<hash>` then `python3 ~/.hermes/skills/autonomous-ai-agents/pickle-rick/scripts/cancel.js`, state path: `<SESSION_ROOT>/state.json`.
+Print: session name, `zellij attach pickle-<hash>`, tab layout (monitor: dashboard top-left / log-stream top-right / morty-logs bottom; runner: switch tabs with Zellij keybinds), cancel: `python3 ~/.hermes/skills/autonomous-ai-agents/pickle-rick/scripts/pickle_utils.py cancel --session <SESSION_ROOT>` (graceful), emergency: `zellij delete-session pickle-<hash>` then `python3 ~/.hermes/skills/autonomous-ai-agents/pickle-rick/scripts/pickle_utils.py cancel --session <SESSION_ROOT>`, state path: `<SESSION_ROOT>/state.json`.
 
 Output: `[TASK_COMPLETED]`
 

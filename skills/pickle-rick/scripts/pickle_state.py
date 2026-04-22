@@ -143,6 +143,12 @@ def cmd_init(args) -> None:
         'max_time_minutes': args.max_time or 720,
     })
 
+    if getattr(args, 'command_template', None):
+        state['command_template'] = args.command_template
+    if getattr(args, 'tmux', False):
+        state['tmux_mode'] = True
+        state['active'] = False
+
     state_path = session_dir / 'state.json'
     locked_write(state_path, state)
 
@@ -267,6 +273,8 @@ def main():
     p_init.add_argument('--max-time', type=int, default=720, help='Max time in minutes')
     p_init.add_argument('--mode', choices=['pickle', 'meeseeks', 'council', 'microverse'],
                         default='pickle', help='Session mode (default: pickle)')
+    p_init.add_argument('--command-template', help='Skill template name (e.g. microverse, anatomy-park)')
+    p_init.add_argument('--tmux', action='store_true', help='Mark session for tmux mode (sets active=false for runner ownership)')
 
     # read
     p_read = sub.add_parser('read', help='Read session state')
