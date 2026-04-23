@@ -42,6 +42,7 @@ import re
 import signal
 import subprocess
 import sys
+import threading
 import time
 from pathlib import Path
 from typing import Optional
@@ -67,8 +68,12 @@ SIGNAL_TOKENS = {
 }
 
 DEFAULT_WORKER_TIMEOUT = 1200  # 20 minutes per iteration
+MAX_HANGGUARD_SECONDS = 1500  # 25 minutes absolute ceiling
 MAX_RATE_LIMIT_RETRIES = 3
 RATE_LIMIT_WAIT_MINUTES = 60
+
+# Module-level reference to current child process for signal-based kill
+_current_proc = None
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -194,6 +199,54 @@ def detect_rate_limit(output: str) -> bool:
     return any(re.search(p, lower) for p in patterns)
 
 
+def _load_mux_settings() -> dict:
+    """Load settings from pickle_settings.json."""
+    settings_path = Path.home() / '.pickle-rick' / 'pickle_settings.json'
+    try:
+        return json.loads(settings_path.read_text())
+    except (json.JSONDecodeError, OSError):
+        return {}
+
+
+def parse_rate_limit_event(output: str) -> Optional[dict]:
+    """Parse NDJSON output for structured rate_limit_event."""
+    for line in output.strip().split('\n'):
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            parsed = json.loads(line)
+            if (parsed.get('type') == 'system' and
+                parsed.get('subtype') == 'rate_limit_event'):
+                return {
+                    'rate_limit_type': parsed.get('rate_limit_type', 'unknown'),
+                    'resets_at_epoch': parsed.get('resets_at_epoch'),
+                }
+        except json.JSONDecodeError:
+            continue
+    return None
+
+
+def compute_error_signature(output: str, exit_code: int) -> Optional[str]:
+    """Extract normalized error signature from iteration output."""
+    if exit_code == 0:
+        return None
+    # Extract last assistant text block from NDJSON
+    assistant_text = extract_assistant_content(output)
+    if not assistant_text:
+        return f"exit_{exit_code}"
+    # Normalize: paths, timestamps, UUIDs, collapse whitespace
+    normalized = assistant_text
+    normalized = re.sub(r'/[\w./-]+', '<PATH>', normalized)
+    normalized = re.sub(r'\d{4}-\d{2}-\d{2}[T ]\d{2}:\d{2}:\d{2}[\d\.+-:Z]*', '<TS>', normalized)
+    normalized = re.sub(r'[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}', '<UUID>', normalized, flags=re.IGNORECASE)
+    normalized = re.sub(r'\d+:\d+', '<N>:<N>', normalized)
+    normalized = ' '.join(normalized.split())
+    if len(normalized) > 200:
+        normalized = normalized[:200]
+    return normalized if normalized else f"exit_{exit_code}"
+
+
 def strip_setup_section(prompt: str) -> str:
     """
     Strip the Setup section from dual-mode templates (e.g. meeseeks.md, szechuan-sauce.md).
@@ -278,6 +331,7 @@ def classify_ticket_completion(iter_log_file: Path, working_dir: str,
             return 'completed'
     except (subprocess.TimeoutExpired, OSError):
         pass
+    # Artifact was confirmed; git diff failure/emptiness is not a blocker
     return 'completed'
 
 
@@ -311,8 +365,75 @@ def build_handoff(state: dict, session_dir: Path, iteration: int) -> str:
         except OSError:
             pass
     
+    # Include TASK_NOTES.md for persistent cross-iteration context
+    task_notes = read_task_notes(session_dir)
+    if task_notes:
+        lines.append("")
+        lines.append("## TASK_NOTES (Persistent)")
+        lines.append(truncate_task_notes(task_notes))
+    
     return '\n'.join(lines)
 
+
+
+
+def read_task_notes(session_dir: Path) -> str:
+    """Read persistent cross-iteration TASK_NOTES.md."""
+    notes_path = session_dir / 'TASK_NOTES.md'
+    try:
+        if notes_path.exists():
+            return notes_path.read_text()
+    except OSError:
+        pass
+    return ''
+
+
+def write_task_notes(session_dir: Path, content: str) -> None:
+    """Atomically write TASK_NOTES.md."""
+    notes_path = session_dir / 'TASK_NOTES.md'
+    tmp_path = notes_path.with_suffix(f'.tmp.{os.getpid()}')
+    try:
+        tmp_path.write_text(content)
+        os.rename(str(tmp_path), str(notes_path))
+    except OSError:
+        try:
+            tmp_path.unlink(missing_ok=True)
+        except OSError:
+            pass
+        try:
+            notes_path.write_text(content)
+        except OSError:
+            pass
+
+
+def truncate_task_notes(content: str, max_chars: int = 8000) -> str:
+    """Smart truncation: preserve ## Next and ## Dead Ends, trim ## Progress first."""
+    if len(content) <= max_chars:
+        return content
+    lines = content.split('\n')
+    # Find section headers
+    section_starts = {}
+    for i, line in enumerate(lines):
+        if line.strip().startswith('## '):
+            section_starts[line.strip()] = i
+    # Priority order for trimming
+    trim_priority = ['## Progress', '## Notes', '## Context']
+    for section in trim_priority:
+        if section in section_starts:
+            idx = section_starts[section]
+            # Find next section or end
+            end_idx = len(lines)
+            for j in range(idx + 1, len(lines)):
+                if lines[j].strip().startswith('## '):
+                    end_idx = j
+                    break
+            # Remove this section
+            lines = lines[:idx] + lines[end_idx:]
+            new_content = '\n'.join(lines)
+            if len(new_content) <= max_chars:
+                return new_content
+    # Fallback: hard truncate from end
+    return content[:max_chars]
 
 def load_persona() -> str:
     """Load the Pickle Rick persona from the skill's references directory."""
@@ -637,7 +758,8 @@ def run_iteration(session_dir: Path, state: dict, iteration: int,
                   timeout: int = DEFAULT_WORKER_TIMEOUT) -> tuple:
     """
     Run a single iteration by spawning hermes -q.
-    Returns (output: str, exit_code: int).
+    Returns (output: str, exit_code: int, timed_out: bool).
+    Uses subprocess.Popen + threading.Timer hangGuard for reliable timeout.
     """
     prompt = build_prompt(state, session_dir, iteration)
     log_file = session_dir / f'iteration_{iteration}.log'
@@ -660,23 +782,55 @@ def run_iteration(session_dir: Path, state: dict, iteration: int,
         print(f"  Iteration {iteration} | Step: {state['step']} | Ticket: {state.get('current_ticket', 'none')}")
     print(f"{'=' * 60}")
     
+    global _current_proc
     try:
-        result = subprocess.run(
+        proc = subprocess.Popen(
             cmd,
-            capture_output=True,
-            text=True,
-            timeout=timeout,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
             cwd=state['working_dir'],
             env={**os.environ, 'PICKLE_SESSION': str(session_dir)},
         )
-        output = result.stdout + result.stderr
+        
+        # hangGuard: SIGTERM -> SIGKILL escalation if process hangs
+        did_timeout = False
+        hang_guard = None
+        
+        def _kill_hung():
+            nonlocal did_timeout
+            did_timeout = True
+            try:
+                proc.terminate()
+            except ProcessLookupError:
+                return
+            # Give 2s grace, then SIGKILL
+            import time
+            time.sleep(2)
+            if proc.poll() is None:
+                try:
+                    proc.kill()
+                except ProcessLookupError:
+                    pass
+        
+        hang_guard = threading.Timer(timeout, _kill_hung)
+        hang_guard.start()
+        
+        _current_proc = proc
+        stdout_b, stderr_b = proc.communicate()
+        _current_proc = None
+        hang_guard.cancel()
+        
+        output = stdout_b.decode('utf-8', errors='replace') + stderr_b.decode('utf-8', errors='replace')
         log_file.write_text(output)
-        return output, result.returncode
-    except subprocess.TimeoutExpired:
-        msg = f"Iteration {iteration} timed out after {timeout}s"
-        print(f"WARNING: {msg}")
-        log_file.write_text(msg)
-        return msg, 1
+        
+        # Write exit code file for monitor/debugging
+        exitcode_file = log_file.with_suffix('.exitcode')
+        try:
+            exitcode_file.write_text(str(proc.returncode if proc.returncode is not None else -1))
+        except OSError:
+            pass
+        
+        return output, proc.returncode if proc.returncode is not None else 1, did_timeout
     except FileNotFoundError:
         print("ERROR: 'hermes' command not found. Is Hermes Agent installed?")
         sys.exit(1)
@@ -696,9 +850,9 @@ def main():
     parser.add_argument('--timeout', type=int, default=DEFAULT_WORKER_TIMEOUT,
                         help='Per-iteration timeout in seconds')
     parser.add_argument('--no-circuit-breaker', action='store_true')
-    
+
     args = parser.parse_args()
-    
+
     # Initialize or resume session
     if args.resume:
         session_dir = Path(args.resume)
@@ -711,7 +865,7 @@ def main():
         if not args.task:
             print("ERROR: --task is required for new sessions")
             sys.exit(1)
-        
+
         # Resolve mode defaults
         mode = args.mode
         max_iter = args.max_iterations
@@ -741,7 +895,7 @@ def main():
         if result.returncode != 0:
             print(f"ERROR: Failed to initialize session:\n{result.stderr}")
             sys.exit(1)
-        
+
         # Parse session dir from output
         for line in result.stdout.strip().split('\n'):
             if line.startswith('SESSION_DIR='):
@@ -750,7 +904,7 @@ def main():
         else:
             print("ERROR: Could not parse SESSION_DIR from init output")
             sys.exit(1)
-        
+
         state = read_state(session_dir)
 
         # Apply min_iterations to state
@@ -759,27 +913,58 @@ def main():
             write_state(session_dir, state)
 
         print(f"New session: {session_dir}")
-    
+
+    # --- Startup validation gate (ported from Claude v1.44.5) ---
+    raw_max_iter = int(state.get('max_iterations', 0))
+    max_iter_val = raw_max_iter if raw_max_iter > 0 else 0
+    raw_cur_iter = int(state.get('iteration', 0))
+    cur_iter_val = raw_cur_iter if raw_cur_iter >= 0 else 0
+    if max_iter_val > 0 and cur_iter_val >= max_iter_val:
+        print(f"ERROR: startup validation failed: iteration ({cur_iter_val}) >= max_iterations ({max_iter_val})")
+        sys.exit(1)
+    worker_timeout = args.timeout
+    if worker_timeout < 30:
+        print(f"WARNING: worker timeout {worker_timeout}s is very short (minimum recommended: 30s)")
+    if worker_timeout > MAX_HANGGUARD_SECONDS:
+        print(f"WARNING: worker timeout {worker_timeout}s exceeds hangGuard ceiling ({MAX_HANGGUARD_SECONDS}s); capping")
+        worker_timeout = MAX_HANGGUARD_SECONDS
+
     # Circuit breaker
     cb = None
     if not args.no_circuit_breaker:
         cb = CircuitBreaker(str(session_dir), state['working_dir'])
-    
-    # Signal handling for graceful shutdown
+
+    # Signal handling for graceful shutdown + child kill
     shutdown = False
     def handle_signal(signum, frame):
         nonlocal shutdown
         shutdown = True
-        print("\nShutting down gracefully...")
-    
+        print(f"\nSignal {signum} received. Shutting down...")
+        global _current_proc
+        if _current_proc is not None:
+            try:
+                _current_proc.terminate()
+            except ProcessLookupError:
+                pass
+
     signal.signal(signal.SIGINT, handle_signal)
     signal.signal(signal.SIGTERM, handle_signal)
-    
+
     start_time = state.get('start_time_epoch', int(time.time()))
     max_time_seconds = state.get('max_time_minutes', args.max_time) * 60
     consecutive_rate_limits = 0
     exit_reason = None
-    
+    mux_settings = _load_mux_settings()
+    max_rate_limit_retries = mux_settings.get('default_max_rate_limit_retries', MAX_RATE_LIMIT_RETRIES)
+    default_rate_limit_wait = mux_settings.get('default_rate_limit_wait_minutes', RATE_LIMIT_WAIT_MINUTES)
+
+    # Stall detection state (ported from Claude v1.44.5)
+    stall_count = 0
+    last_state_iteration = cur_iter_val
+    # Per-ticket timeout counter (FR-B3/B4)
+    timeout_count = 0
+    last_timeout_ticket = None
+
     mode = state.get('mode', 'pickle')
     mode_label = {'pickle': 'Pickle Rick', 'meeseeks': 'Mr. Meeseeks Review',
                   'council': 'Council of Ricks', 'microverse': 'Microverse'}.get(mode, mode)
@@ -792,22 +977,22 @@ def main():
     print(f"Max Iterations: {state['max_iterations']}")
     print(f"Max Time: {state.get('max_time_minutes', args.max_time)}m")
     print(f"{'=' * 60}")
-    
+
     while not shutdown:
         iteration = state['iteration']
-        
+
         # Check limits
         if iteration >= state['max_iterations']:
             print(f"\nMax iterations reached ({iteration})")
             exit_reason = 'max_iterations'
             break
-        
+
         elapsed = int(time.time()) - start_time
         if elapsed >= max_time_seconds:
             print(f"\nTime limit reached ({elapsed // 60}m)")
             exit_reason = 'time_limit'
             break
-        
+
         # Check circuit breaker
         if cb and not cb.can_execute():
             status = cb.get_status()
@@ -815,14 +1000,50 @@ def main():
             log_activity(session_dir, 'circuit_open', reason=status['reason'])
             exit_reason = 'circuit_open'
             break
-        
+
+        # Stall detection (only when CB disabled; CB has its own threshold)
+        if not args.no_circuit_breaker:
+            # CB-enabled: stall detection handled by CB
+            stall_count = 0
+        else:
+            if iteration == last_state_iteration:
+                stall_count += 1
+                if stall_count >= 2:
+                    print(f"WARNING: state.iteration has not advanced in {stall_count} outer-loop iterations (stuck at {iteration}). Exiting to avoid wasted API calls.")
+                    exit_reason = 'stall'
+                    break
+            else:
+                stall_count = 0
+            last_state_iteration = iteration
+
         # Run iteration
         log_activity(session_dir, 'iteration_start', iteration=iteration)
-        output, exit_code = run_iteration(session_dir, state, iteration, args.timeout)
-        
+        output, exit_code, did_timeout = run_iteration(session_dir, state, iteration, worker_timeout)
+
+        # Per-ticket timeout counter halt (FR-B3/B4)
+        if did_timeout:
+            current_ticket = state.get('current_ticket')
+            if current_ticket == last_timeout_ticket and current_ticket is not None:
+                timeout_count += 1
+                if timeout_count >= 2:
+                    print(f"WARNING: Timeout repeated {timeout_count} times on ticket {current_ticket}. Halting to avoid burn.")
+                    log_activity(session_dir, 'timeout_repeat_halt', ticket=current_ticket, count=timeout_count)
+                    exit_reason = 'timeout_repeat'
+                    break
+            else:
+                timeout_count = 1
+                last_timeout_ticket = current_ticket
+            # Write TASK_NOTES timeout stub
+            existing_notes = read_task_notes(session_dir)
+            timeout_note = f"## Timeout Halt\nIteration {iteration} timed out on ticket {current_ticket}.\n"
+            write_task_notes(session_dir, existing_notes + "\n" + timeout_note if existing_notes else timeout_note)
+        else:
+            timeout_count = 0
+            last_timeout_ticket = None
+
         # Classify output
         classification = classify_output(output)
-        
+
         # Ghost-ticket validation: corroborate task_completed with artifacts
         if classification == 'task_completed':
             iter_log_file = session_dir / f'iteration_{iteration}.log'
@@ -830,7 +1051,6 @@ def main():
             ticket_dir = None
             if current_ticket:
                 ticket_dir = session_dir / 'tickets' / current_ticket
-            # Derive role from current mode (review modes use review artifacts)
             role = 'review' if state.get('mode') in ('meeseeks', 'council') else 'implementation'
             verdict = classify_ticket_completion(
                 iter_log_file, state['working_dir'], ticket_dir, role
@@ -840,48 +1060,69 @@ def main():
                 log_activity(session_dir, 'ghost_ticket_detected', iteration=iteration,
                              ticket=current_ticket, role=role)
                 classification = 'continue'
-        
+
         print(f"  Result: {classification}")
-        
+
         # Check for rate limits
         if detect_rate_limit(output):
             consecutive_rate_limits += 1
-            if consecutive_rate_limits >= MAX_RATE_LIMIT_RETRIES:
+            if consecutive_rate_limits >= max_rate_limit_retries:
                 print(f"\nRate limit reached {consecutive_rate_limits} times. Stopping.")
                 log_activity(session_dir, 'rate_limit_exhausted')
                 exit_reason = 'rate_limit_exhausted'
                 break
-            wait_time = RATE_LIMIT_WAIT_MINUTES * 60
-            print(f"  Rate limited. Waiting {RATE_LIMIT_WAIT_MINUTES}m (attempt {consecutive_rate_limits}/{MAX_RATE_LIMIT_RETRIES})")
-            log_activity(session_dir, 'rate_limit_wait', wait_minutes=RATE_LIMIT_WAIT_MINUTES)
-            time.sleep(wait_time)
+            rl_event = parse_rate_limit_event(output)
+            if rl_event and rl_event.get('resets_at_epoch'):
+                wait_until = rl_event['resets_at_epoch'] + 30
+                wait_seconds = max(0, wait_until - int(time.time()))
+                wait_source = 'resets_at_epoch'
+                wait_minutes = wait_seconds // 60
+            else:
+                wait_minutes = default_rate_limit_wait
+                wait_seconds = wait_minutes * 60
+                wait_source = 'config_default'
+            cap_seconds = default_rate_limit_wait * 60 * 3
+            if wait_seconds > cap_seconds:
+                wait_seconds = cap_seconds
+                wait_minutes = wait_seconds // 60
+            rl_wait_path = session_dir / 'rate_limit_wait.json'
+            rl_wait_path.write_text(json.dumps({
+                'waiting': True,
+                'wait_until': int(time.time()) + wait_seconds,
+                'consecutive_waits': consecutive_rate_limits,
+                'rate_limit_type': rl_event.get('rate_limit_type', 'unknown') if rl_event else 'unknown',
+                'resets_at_epoch': rl_event.get('resets_at_epoch') if rl_event else None,
+                'wait_source': wait_source,
+            }, indent=2))
+            print(f"  Rate limited. Waiting {wait_minutes}m (attempt {consecutive_rate_limits}/{max_rate_limit_retries}, source: {wait_source})")
+            log_activity(session_dir, 'rate_limit_wait', wait_minutes=wait_minutes, source=wait_source)
+            time.sleep(wait_seconds)
+            rl_wait_path.unlink(missing_ok=True)
             continue
         else:
             consecutive_rate_limits = 0
-        
+
         # Update circuit breaker
         has_progress = classification in ('task_completed', 'prd_complete', 'ticket_selected')
         if cb:
             cb_state = cb.record_result(
                 has_progress=has_progress,
-                error_signature=f"exit_{exit_code}" if exit_code != 0 else None,
+                error_signature=compute_error_signature(output, exit_code),
                 iteration=iteration,
             )
             if cb_state == 'OPEN':
                 print(f"\nCircuit breaker tripped: {cb.get_status()['reason']}")
                 exit_reason = 'circuit_open'
                 break
-        
+
         # Handle classification
         if classification == 'epic_completed':
-            # Check for chain_meeseeks before exiting
             try:
                 cur_state = read_state(session_dir)
             except (json.JSONDecodeError, OSError):
                 cur_state = state
 
             if cur_state.get('chain_meeseeks'):
-                # Transition to meeseeks review mode
                 settings_path = SCRIPTS_DIR.parent / 'pickle_settings.json'
                 if not settings_path.exists():
                     settings_path = Path.home() / '.pickle-rick' / 'pickle_settings.json'
@@ -891,7 +1132,6 @@ def main():
                 )
                 write_state(session_dir, new_state)
                 state = new_state
-                # Reset circuit breaker for meeseeks phase
                 if cb:
                     cb = CircuitBreaker(str(session_dir), state['working_dir'])
                 print(f"\n  Transitioning to Meeseeks review mode (chain_meeseeks)")
@@ -906,9 +1146,8 @@ def main():
             log_activity(session_dir, 'epic_completed')
             exit_reason = 'epic_completed'
             break
-        
+
         if classification == 'review_clean':
-            # min_iterations gate (critical for meeseeks/council mode)
             try:
                 cur_state = read_state(session_dir)
             except (json.JSONDecodeError, OSError):
@@ -929,18 +1168,18 @@ def main():
                 log_activity(session_dir, 'review_complete', iteration=iteration)
                 exit_reason = 'review_complete'
                 break
-        
+
         if classification == 'blocked':
             print(f"\n  Worker is BLOCKED. Check iteration log for details.")
             print(f"  Log: {session_dir}/iteration_{iteration}.log")
             log_activity(session_dir, 'blocked', iteration=iteration)
             exit_reason = 'blocked'
             break
-        
+
         # Increment iteration
         state['iteration'] = iteration + 1
         log_activity(session_dir, 'iteration_end', iteration=iteration, classification=classification)
-        
+
         # Re-read state (worker may have updated it)
         try:
             state = read_state(session_dir)
@@ -948,7 +1187,7 @@ def main():
             write_state(session_dir, state)
         except (json.JSONDecodeError, OSError) as e:
             print(f"WARNING: Could not re-read state: {e}")
-    
+
     # Deactivate session
     try:
         state = read_state(session_dir)
@@ -956,18 +1195,18 @@ def main():
         write_state(session_dir, state)
     except (json.JSONDecodeError, OSError):
         pass
-    
+
     if shutdown and exit_reason is None:
         exit_reason = 'shutdown'
-    
+
     elapsed = int(time.time()) - start_time
     log_activity(session_dir, 'session_end', duration_min=round(elapsed / 60), exit_reason=exit_reason)
     print(f"\nSession ended. Duration: {elapsed // 60}m {elapsed % 60}s")
     print(f"Session dir: {session_dir}")
-    
+
     # Explicit exit code so parent processes can detect failure.
-    is_failed_exit = exit_reason in ('circuit_open', 'rate_limit_exhausted',
-                                      'max_iterations', 'time_limit', 'blocked', 'shutdown')
+    is_failed_exit = exit_reason in ('circuit_open', 'rate_limit_exhausted', 'timeout_repeat',
+                                      'max_iterations', 'time_limit', 'blocked', 'shutdown', 'stall')
     sys.exit(1 if is_failed_exit else 0)
 
 

@@ -1,13 +1,13 @@
 ---
 name: pickle-rick-help
-description: "Display Pickle Rick for Hermes help — list all available commands, skills, and utilities. Synced with pickle-rick-claude v1.19.0."
-version: 0.3.0
+description: "Display Pickle Rick for Hermes help — list all available commands, skills, and utilities."
+version: 0.4.0
 author: Gregory Dickson
 license: Apache-2.0
 metadata:
   hermes:
     tags: [help, pickle-rick, documentation]
-    related_skills: [pickle-rick, pickle-rick-meeseeks, pickle-rick-microverse, pickle-rick-portal-gun, pickle-rick-council, pickle-rick-jar, pickle-rick-morty]
+    related_skills: [pickle-rick, pickle-rick-anatomy-park, pickle-rick-meeseeks, pickle-rick-meeseeks-zellij, pickle-rick-microverse, pickle-rick-portal-gun, pickle-rick-council, pickle-rick-jar, pickle-rick-morty, pickle-rick-morty-review, pickle-rick-chaos, pickle-rick-dot, pickle-rick-dot-patterns, pickle-rick-attract, pickle-rick-tmux, pickle-rick-zellij, pickle-rick-prd, pickle-rick-refine-prd, pickle-rick-retry, pickle-rick-standup, pickle-rick-szechuan-sauce]
 ---
 
 # Pickle Rick for Hermes — Help
@@ -16,14 +16,16 @@ metadata:
 
 - User says "help pickle", "pickle rick help", "what pickle commands are there"
 
-## Skills (20 total)
+## Skills (22 total)
 
 | Skill | What It Does |
 |-------|-------------|
 | **pickle-rick** | Core autonomous loop: PRD -> Breakdown -> Implement -> Review -> Ship |
+| **pickle-rick-anatomy-park** | Three-phase subsystem deep review — trace flows, fix without regression, catalog trap doors |
 | **pickle-rick-prd** | Interactive PRD drafter with user interview and verification-first design |
 | **pickle-rick-refine-prd** | 3 parallel analysts refine PRD + decompose into atomic tickets |
 | **pickle-rick-meeseeks** | Iterative code review (10+ passes, 8 focus categories) |
+| **pickle-rick-meeseeks-zellij** | Meeseeks review loop in Zellij layout |
 | **pickle-rick-microverse** | Convergence optimization (metric-driven iterative improvement) |
 | **pickle-rick-portal-gun** | Pattern transplantation v2: gene transfusion, import graph tracing, pattern library, convergence loop |
 | **pickle-rick-council** | PR stack review with agent-executable directives |
@@ -36,9 +38,9 @@ metadata:
 | **pickle-rick-attract** | Submit DOT pipelines to attractor server with detach mode + checkpoints |
 | **pickle-rick-tmux** | tmux launcher with live monitor dashboard |
 | **pickle-rick-zellij** | Zellij launcher with KDL layouts |
-| **pickle-rick-meeseeks-zellij** | Meeseeks review loop in Zellij |
 | **pickle-rick-standup** | Activity log standup formatter (Slack-formatted) |
 | **pickle-rick-retry** | Retry failed/timed-out tickets |
+| **pickle-rick-szechuan-sauce** | Principle-driven code quality convergence |
 | **pickle-rick-help** | This help screen |
 
 ## CLI Scripts
@@ -52,10 +54,17 @@ python3 scripts/pickle_state.py update --session <path> --step breakdown
 # Orchestrators
 python3 scripts/mux_runner.py --task "..." --working-dir .
 python3 scripts/microverse_runner.py --metric "..." --task "..."
+python3 scripts/pipeline_runner.py --task "..." --working-dir . --phases pickle,anatomy-park,szechuan-sauce
 
 # Circuit breaker
 python3 scripts/circuit_breaker.py status --session <path>
 python3 scripts/circuit_breaker.py reset --session <path>
+
+# Scope resolver (stub — full port deferred)
+python3 scripts/scope_resolver.py branch:strict --session-root <path> --repo-root <path>
+
+# Council publish (auto-post PR comments at session end)
+python3 scripts/council_publish.py <SESSION_ROOT> [--dry-run]
 
 # Pickle Jar
 python3 scripts/pickle_jar.py add --task "..." --working-dir .

@@ -122,8 +122,9 @@ class TestLockedUpdate:
     def test_update_corrupt_file(self, tmp_session):
         state_path = tmp_session / 'state.json'
         state_path.write_text('not json')
-        with pytest.raises(json.JSONDecodeError):
-            locked_update(state_path, {'step': 'breakdown'})
+        result = locked_update(state_path, {'step': 'breakdown'})
+        assert result['step'] == 'breakdown'
+        assert result['active'] is True
 
 
 class TestCLI:

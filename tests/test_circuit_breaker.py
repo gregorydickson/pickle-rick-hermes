@@ -91,12 +91,13 @@ class TestRecordResult:
 
     def test_no_progress_threshold_opens_via_half_open(self, tmp_path):
         cb = CircuitBreaker(str(tmp_path), str(tmp_path))
-        # First reach HALF_OPEN
-        for i in range(cb.NO_PROGRESS_THRESHOLD):
+        # First reach HALF_OPEN (2 iterations)
+        for i in range(cb.HALF_OPEN_AFTER_ITERATIONS):
             cb.record_result(has_progress=False, iteration=i)
         assert cb.state['state'] == 'HALF_OPEN'
-        # Then OPEN
-        cb.record_result(has_progress=False, iteration=cb.NO_PROGRESS_THRESHOLD)
+        # Then OPEN (3 more iterations to reach threshold of 5)
+        for i in range(cb.NO_PROGRESS_THRESHOLD - cb.HALF_OPEN_AFTER_ITERATIONS):
+            cb.record_result(has_progress=False, iteration=cb.HALF_OPEN_AFTER_ITERATIONS + i)
         assert cb.state['state'] == 'OPEN'
 
     def test_same_error_threshold_opens(self, tmp_path):
@@ -120,15 +121,16 @@ class TestRecordResult:
 
     def test_history_recorded(self, tmp_path):
         cb = CircuitBreaker(str(tmp_path), str(tmp_path))
-        for i in range(cb.NO_PROGRESS_THRESHOLD):
+        for i in range(cb.HALF_OPEN_AFTER_ITERATIONS):
             cb.record_result(has_progress=False, iteration=i)
         assert len(cb.state['history']) >= 1
         assert cb.state['history'][-1]['to'] == 'HALF_OPEN'
 
     def test_total_opens_tracked(self, tmp_path):
         cb = CircuitBreaker(str(tmp_path), str(tmp_path))
-        # Drive to OPEN
-        for i in range(cb.NO_PROGRESS_THRESHOLD + 1):
+        # Drive to OPEN: HALF_OPEN_AFTER_ITERATIONS to HALF_OPEN, then enough to hit OPEN
+        total_needed = cb.NO_PROGRESS_THRESHOLD
+        for i in range(total_needed):
             cb.record_result(has_progress=False, iteration=i)
         assert cb.state['total_opens'] == 1
 

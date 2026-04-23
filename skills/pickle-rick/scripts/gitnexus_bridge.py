@@ -28,7 +28,7 @@ def is_available() -> bool:
     try:
         result = subprocess.run(
             ['npx', 'gitnexus', '--version'],
-            capture_output=True, text=True, timeout=15
+            capture_output=True, text=True, timeout=5
         )
         return result.returncode == 0
     except (subprocess.TimeoutExpired, FileNotFoundError):

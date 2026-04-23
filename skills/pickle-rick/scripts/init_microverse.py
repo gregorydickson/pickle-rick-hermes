@@ -14,6 +14,7 @@ Example:
 
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
 from typing import Optional, Dict, Any
@@ -68,9 +69,11 @@ def create_microverse_state(
 
 
 def write_microverse_state(session_dir: Path, state: Dict[str, Any]) -> None:
-    """Write microverse.json to the session directory."""
+    """Write microverse.json to the session directory atomically."""
     microverse_path = session_dir / 'microverse.json'
-    microverse_path.write_text(json.dumps(state, indent=2))
+    tmp_path = session_dir / f'microverse.json.tmp.{os.getpid()}'
+    tmp_path.write_text(json.dumps(state, indent=2))
+    os.replace(str(tmp_path), str(microverse_path))
 
 
 def parse_metric_json(json_str: str) -> Dict[str, Any]:
@@ -136,7 +139,7 @@ Returns:
 
     # Create state
     try:
-        convergence_target = int(args.convergence_target) if args.convergence_target is not None else None
+        convergence_target = args.convergence_target if args.convergence_target is not None else None
         state = create_microverse_state(
             prd_path=str(target_path.resolve()),
             metric=metric,

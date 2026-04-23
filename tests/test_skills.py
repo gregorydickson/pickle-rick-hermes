@@ -21,8 +21,8 @@ SKILL_NAMES = [name for name, _ in ALL_SKILLS]
 
 
 class TestSkillCount:
-    def test_16_skills(self):
-        assert len(ALL_SKILLS) == 16, f"Expected 16 skills, got {len(ALL_SKILLS)}: {SKILL_NAMES}"
+    def test_22_skills(self):
+        assert len(ALL_SKILLS) == 22, f"Expected 22 skills, got {len(ALL_SKILLS)}: {SKILL_NAMES}"
 
 
 class TestFrontmatter:

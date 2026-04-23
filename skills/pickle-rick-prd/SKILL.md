@@ -36,7 +36,7 @@ Initialize PAUSED session, interview user, draft PRD.
 
 ## Step 1: Initialize
 ```bash
-python3 ~/.hermes/skills/autonomous-ai-agents/pickle-rick/scripts/setup.js" --task "user input" --paused
+python3 ~/.hermes/skills/autonomous-ai-agents/pickle-rick/scripts/pickle_state.py init --task "user input" --paused
 ```
 Extract `SESSION_ROOT=<path>`. Extension root: `~/.pickle-rick` (`~/.hermes/skills/autonomous-ai-agents/pickle-rick`).
 
@@ -51,7 +51,7 @@ PAUSED mode — normal chat. Interrogate:
 
 ## Step 3: Draft & Finalize
 1. Write PRD to `${SESSION_ROOT}/prd.md` using template below
-2. `python3 ~/.hermes/skills/autonomous-ai-agents/pickle-rick/scripts/update-state.js" step breakdown "${SESSION_ROOT}"`
+2. `python3 ~/.hermes/skills/autonomous-ai-agents/pickle-rick/scripts/pickle_state.py update step breakdown "${SESSION_ROOT}"`
 3. Verify `prd.md` exists AND state.json `step: breakdown`. Fail → warn, do NOT recommend --resume.
 4. Handoff: "Run `pickle-rick --resume ${SESSION_ROOT}` or `pickle-rick-tmux --resume ${SESSION_ROOT}`."
 

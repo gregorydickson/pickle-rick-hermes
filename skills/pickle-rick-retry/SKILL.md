@@ -25,11 +25,11 @@ You are retrying a failed or timed-out Pickle Rick ticket.
 
 Run the retry script with the ticket ID:
 ```bash
-python3 ~/.hermes/skills/autonomous-ai-agents/pickle-rick/scripts/retry-ticket.js" user input
+python3 ~/.hermes/skills/autonomous-ai-agents/pickle-rick/scripts/pickle_utils.py retry user input
 ```
 
 After the script runs:
-1. Read the printed `spawn-morty.js` command from the output.
+1. Read the printed `pickle_state.py init` command from the output.
 2. Run `git status` — if there are uncommitted changes, stash them with `git stash`.
 3. Execute the printed spawn-morty command exactly as shown.
 4. After Morty outputs `[I AM DONE]`, proceed with the standard validation and commit flow (audit docs, check git diff, run tests, commit if passing, mark ticket Done).

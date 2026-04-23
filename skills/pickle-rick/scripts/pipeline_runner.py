@@ -30,6 +30,11 @@ SCRIPTS_DIR = Path(__file__).parent
 sys.path.insert(0, str(SCRIPTS_DIR))
 
 from pickle_state import locked_read, locked_write
+try:
+    from scope_resolver import resolve_scope, refresh_scope
+except ImportError:
+    resolve_scope = None
+    refresh_scope = None
 
 # ---------------------------------------------------------------------------
 # Constants
@@ -247,6 +252,8 @@ def main():
                         help='Per-phase timeout in seconds')
     parser.add_argument('--dry-run', action='store_true',
                         help='Print phase plan without executing')
+    parser.add_argument('--scope', default=None,
+                        help='Scope flag for scoped pipeline runs (e.g. branch:strict, diff:main)')
 
     args = parser.parse_args()
 
@@ -318,6 +325,18 @@ def main():
 
     warn_dirty_working_tree(working_dir)
 
+    # Scope setup (no-op stub if scope_resolver not fully ported)
+    if args.scope and resolve_scope is not None:
+        try:
+            resolve_scope(
+                scope_flag=args.scope,
+                session_root=str(session_dir),
+                repo_root=working_dir,
+            )
+            print(f"  Scope resolved: {args.scope}")
+        except Exception as e:
+            print(f"WARNING: Scope resolution failed: {e}")
+
     # Signal handling: write .cancel marker and let child handle cleanup
     cancel_path = session_dir / '.cancel'
     shutdown = False
@@ -375,6 +394,15 @@ def main():
         # Reset state for this phase
         reset_state_for_phase(session_dir, phase)
 
+        # Per-phase scope refresh (no-op if scope_resolver is stub)
+        if args.scope and refresh_scope is not None:
+            try:
+                refreshed = refresh_scope(str(session_dir), phase)
+                if refreshed:
+                    print(f"  Scope refreshed for {phase}: {len(refreshed.allowed_paths)} paths")
+            except Exception as e:
+                print(f"WARNING: Scope refresh failed for {phase}: {e}")
+
         # Setup phase config and skip if no work
         if not setup_phase_config(session_dir, phase, working_dir):
             print(f"  Phase {phase} skipped")
@@ -398,11 +426,16 @@ def main():
 
         write_pipeline_status(session_dir, 'running', phase)
 
+        phase_log = session_dir / f'phase_{phase}.log'
         try:
             active_child = subprocess.Popen(
                 cmd, cwd=working_dir, env=env,
+                stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
             )
-            exit_code = active_child.wait(timeout=args.timeout)
+            stdout, _ = active_child.communicate(timeout=args.timeout)
+            phase_log.write_bytes(stdout)
+            sys.stdout.buffer.write(stdout)
+            exit_code = active_child.returncode
         except subprocess.TimeoutExpired:
             print(f"WARNING: Phase {phase} timed out after {args.timeout}s")
             if active_child and active_child.poll() is None:

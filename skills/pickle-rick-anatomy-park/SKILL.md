@@ -217,18 +217,24 @@ For current subsystem, trace COMPLETE data flow:
 
 1. **Trace data path**: input → bug → wrong output. Show exact file:line path.
 2. **Check fix history**: Run `git log --oneline --all -- <file>` for files with findings.
-3. **Rate every finding**:
+3. **Reference principles**: Read `pickle-rick-szechuan-sauce/principles.md` confidence rubric. Apply false-positives pre-filter.
+4. **Rate every finding** with confidence score:
+   - Format: `[SEVERITY, conf=<score>]` — e.g. `[CRITICAL, conf=95]`, `[HIGH, conf=75]`
+   - Drop findings with `conf < 80` unless CRITICAL with `conf ≥ 50` (tag `[NEEDS-VERIFICATION]`)
    - **CRITICAL**: Data corruption, security bypass, pipeline breakage, wrong financial calc
    - **HIGH**: Defense-in-depth gap, incorrect non-corrupting behavior, resource exhaustion
    - **MEDIUM**: Incomplete error handling, edge case gaps
    - **LOW**: Naming, duplication, style
-4. **Trap Door Identification**: From git history, identify structural weaknesses that cause repeated bugs. Format: `TRAP DOOR (<subsystem>): <one-line description>`
+   - Add `**Confidence:** <1-sentence justification>` after each finding
+5. **Trap Door Identification**: From git history, identify structural weaknesses that cause repeated bugs. Format: `TRAP DOOR (<subsystem>): <one-line description>`
 
 Write findings to `${SESSION_ROOT}/findings_<subsystem>_iter<N>.md`
 
+**Zero-findings rule**: A subsystem with only `<80` candidates still rotates — dropped candidates append to `${SESSION_ROOT}/<subsystem>/dropped_findings.md` for audit trail. Rotate `dropped_findings.md` at 200 lines (rename to `.<timestamp>`, start fresh).
+
 #### PHASE 2: FIX (one finding only)
 
-1. Select single highest-severity finding from Phase 1
+1. Select single highest-severity finding from Phase 1 (prefer highest confidence among same severity)
 2. Determine minimal fix
 3. **Write regression test** that fails before fix, passes after
 4. Apply fix

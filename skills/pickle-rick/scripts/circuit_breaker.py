@@ -179,6 +179,10 @@ class CircuitBreaker:
                       iteration: int = 0,
                       current_step: Optional[str] = None,
                       current_ticket: Optional[str] = None) -> str:
+        # Also detect git-based progress automatically
+        progress_info = self._detect_progress(current_step, current_ticket)
+        has_progress = has_progress or progress_info['has_progress']
+        
         current_state = self.state['state']
         
         if has_progress:
@@ -214,7 +218,8 @@ class CircuitBreaker:
                     self._transition('OPEN',
                         f"No progress after {self.state['consecutive_no_progress']} iterations (HALF_OPEN test failed)",
                         iteration)
-                elif current_state == 'CLOSED':
+            elif self.state['consecutive_no_progress'] >= self.HALF_OPEN_AFTER_ITERATIONS:
+                if current_state == 'CLOSED':
                     self._transition('HALF_OPEN',
                         f"No progress for {self.state['consecutive_no_progress']} iterations -- testing",
                         iteration)

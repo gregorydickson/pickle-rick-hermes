@@ -30,7 +30,7 @@ Show a formatted standup summary from Pickle Rick activity logs.
 ### Step 1: Run the standup helper
 
 ```bash
-python3 ~/.hermes/skills/autonomous-ai-agents/pickle-rick/scripts/standup.js user input
+python3 ~/.hermes/skills/autonomous-ai-agents/pickle-rick/scripts/pickle_utils.py standup user input
 ```
 
 If no arguments provided, defaults to `--days 1` (yesterday's activity).

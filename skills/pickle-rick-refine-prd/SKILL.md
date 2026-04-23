@@ -34,13 +34,13 @@ Refine and decompose PRD into atomic tickets using parallel Morty analysis team.
 ## Step 0: Parse Flags
 `--run` → AUTO_RUN. `--meeseeks` → CHAIN_MEESEEKS (implies --run). `--resume [PATH]` → RESUME_MODE (reuse existing session). Remainder = `${TASK_ARGS}`.
 
-If `--resume` has a path argument → `RESUME_SESSION = <path>`. If `--resume` with no path → resolve via `node "~/.hermes/skills/autonomous-ai-agents/pickle-rick/scripts/get-session.js"` → `RESUME_SESSION`.
+If `--resume` has a path argument → `RESUME_SESSION = <path>`. If `--resume` with no path → resolve via `python3 ~/.hermes/skills/autonomous-ai-agents/pickle-rick/scripts/pickle_utils.py status` → `RESUME_SESSION`.
 
 ## Step 1: Locate PRD
 
 **If RESUME_MODE**: PRD is at `${RESUME_SESSION}/prd.md`. If missing → "Session has no prd.md. Run `pickle-rick-prd` first." Stop. Set `SESSION_ROOT = ${RESUME_SESSION}`.
 
-**If NOT RESUME_MODE**: Priority: 1) explicit path in `${TASK_ARGS}`, 2) `prd.md`/`PRD.md` in cwd, 3) `node "~/.hermes/skills/autonomous-ai-agents/pickle-rick/scripts/get-session.js"` → session's `prd.md`.
+**If NOT RESUME_MODE**: Priority: 1) explicit path in `${TASK_ARGS}`, 2) `prd.md`/`PRD.md` in cwd, 3) `python3 ~/.hermes/skills/autonomous-ai-agents/pickle-rick/scripts/pickle_utils.py status` → session's `prd.md`.
 
 Not found → "Run `pickle-rick-prd` first or pass path." Stop.
 

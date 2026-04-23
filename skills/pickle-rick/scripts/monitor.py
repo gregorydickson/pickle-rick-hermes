@@ -227,6 +227,7 @@ def render(session_dir: Path) -> bool:
             pass
     
     # Microverse state with sparkline trend
+    out = []
     mv_path = session_dir / 'microverse.json'
     if mv_path.exists():
         try:
@@ -247,7 +248,7 @@ def render(session_dir: Path) -> bool:
     
     key_width = max(len(k) for k, v in fields) + 1
     
-    out = ['\033[2J\033[H']
+    out = ['\033[2J\033[H'] + out
     out.append(f'\n{MX.BRIGHT}◤ PICKLE RICK — LIVE MONITOR ◢{MX.R}\n')
     out.append(f'{sep}\n')
     for k, v in fields:

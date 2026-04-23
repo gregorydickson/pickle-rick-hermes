@@ -96,7 +96,11 @@ def locked_update(state_path: Path, updates: Dict[str, Any]) -> Dict[str, Any]:
     with open(lock_path, 'w') as lock_f:
         fcntl.flock(lock_f.fileno(), fcntl.LOCK_EX)
         try:
-            state = json.loads(state_path.read_text())
+            try:
+                state = json.loads(state_path.read_text())
+            except (json.JSONDecodeError, OSError) as e:
+                print(f"WARNING: Could not read state at {state_path}: {e}. Using default state.", file=sys.stderr)
+                state = dict(DEFAULT_STATE)
             # Record history for step/ticket changes
             if 'step' in updates and updates['step'] != state.get('step'):
                 state.setdefault('history', []).append({
@@ -108,7 +112,7 @@ def locked_update(state_path: Path, updates: Dict[str, Any]) -> Dict[str, Any]:
             tmp_path = state_path.with_suffix(f'.tmp.{os.getpid()}')
             tmp_path.write_text(json.dumps(state, indent=2))
             try:
-                os.rename(str(tmp_path), str(state_path))
+                os.replace(str(tmp_path), str(state_path))
             except OSError:
                 tmp_path.unlink(missing_ok=True)
                 state_path.write_text(json.dumps(state, indent=2))
@@ -119,6 +123,16 @@ def locked_update(state_path: Path, updates: Dict[str, Any]) -> Dict[str, Any]:
 # ---------------------------------------------------------------------------
 # Commands
 # ---------------------------------------------------------------------------
+
+def locked_append_activity_log(activity_log: Path, log_entry: Dict[str, Any]) -> None:
+    """Append to activity.jsonl with an exclusive lock."""
+    with open(activity_log, 'a') as f:
+        fcntl.flock(f.fileno(), fcntl.LOCK_EX)
+        try:
+            f.write(json.dumps(log_entry) + '\n')
+        finally:
+            fcntl.flock(f.fileno(), fcntl.LOCK_UN)
+
 
 def cmd_init(args) -> None:
     """Initialize a new session."""
@@ -164,8 +178,7 @@ def cmd_init(args) -> None:
         'session': session_dir.name,
         'original_prompt': args.task or '',
     }
-    with open(activity_log, 'a') as f:
-        f.write(json.dumps(log_entry) + '\n')
+    locked_append_activity_log(activity_log, log_entry)
 
     print(f"SESSION_DIR={session_dir}")
     print(f"STATE_FILE={state_path}")
@@ -220,6 +233,9 @@ def cmd_deactivate(args) -> None:
     """Deactivate session."""
     session_dir = Path(args.session)
     state_path = session_dir / 'state.json'
+    if not state_path.exists():
+        print(f"WARNING: No state.json found at {state_path}", file=sys.stderr)
+        return
     state = locked_update(state_path, {'active': False})
 
     # Log session end
@@ -232,8 +248,7 @@ def cmd_deactivate(args) -> None:
         'duration_min': round(elapsed / 60),
     }
     activity_log = session_dir / 'activity.jsonl'
-    with open(activity_log, 'a') as f:
-        f.write(json.dumps(log_entry) + '\n')
+    locked_append_activity_log(activity_log, log_entry)
 
     print(f"Session deactivated. Duration: {elapsed // 60}m {elapsed % 60}s")
 
@@ -252,8 +267,7 @@ def cmd_log(args) -> None:
         log_entry['ticket'] = args.ticket
     if args.description:
         log_entry['title'] = args.description
-    with open(activity_log, 'a') as f:
-        f.write(json.dumps(log_entry) + '\n')
+    locked_append_activity_log(activity_log, log_entry)
     print(f"Logged: {args.event}")
 
 

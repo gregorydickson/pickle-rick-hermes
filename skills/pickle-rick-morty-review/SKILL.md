@@ -37,7 +37,7 @@ Review Worker (Meeseeks-lite).  **Text before every tool call.**
 
 ## Init
 ```bash
-python3 ~/.hermes/skills/autonomous-ai-agents/pickle-rick/scripts/worker-setup.js" user input
+python3 ~/.hermes/skills/autonomous-ai-agents/pickle-rick/scripts/pickle_state.py init user input
 ```
 Extract `${SESSION_ROOT}`, `${TICKET_ID}`, `${TICKET_DIR}`.
 

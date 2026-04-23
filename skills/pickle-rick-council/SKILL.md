@@ -68,17 +68,19 @@ Run `npx gitnexus analyze`. Warn on failure (non-fatal).
 
 ### Step 8: Initialize
 ```bash
-python3 ~/.hermes/skills/autonomous-ai-agents/pickle-rick/scripts/setup.js" --tmux --min-iterations <MIN> --max-iterations <MAX> --command-template council-of-ricks.md --task "Council of Ricks Stack Review: <task-text>"
+python3 ~/.hermes/skills/autonomous-ai-agents/pickle-rick/scripts/pickle_state.py init --tmux --min-iterations <MIN> --max-iterations <MAX> --command-template council-of-ricks.md --task "Council of Ricks Stack Review: <task-text>"
 ```
 Extract `SESSION_ROOT=<path>`. Session name: `council-<hash>` from basename.
 ```bash
 tmux new-session -d -s <name> -c <working_dir> && sleep 1
-tmux send-keys -t <name>:0 "python3 ~/.hermes/skills/autonomous-ai-agents/pickle-rick/scripts/mux-runner.js <SESSION_ROOT>; echo ''; echo 'The Council has adjourned.'; read" Enter
+tmux send-keys -t <name>:0 "python3 ~/.hermes/skills/autonomous-ai-agents/pickle-rick/scripts/mux_runner.py <SESSION_ROOT>; echo ''; echo 'The Council has adjourned.'; read" Enter
 bash ~/.hermes/skills/autonomous-ai-agents/pickle-rick/scripts/tmux-monitor.sh" <name> <SESSION_ROOT> council
 ```
 
 ### Step 9: Report
-Print: session name, attach command, branches, gates, GitNexus status, min/max passes, cancel (`eat-pickle`), emergency (`tmux kill-session`), state path.
+Print: session name, attach command, branches, gates, GitNexus status, min/max passes, cancel (`pickle_utils.py cancel --session`), emergency (`tmux kill-session`), state path.
+
+**Auto-publish** (optional): At session end, run `python3 ~/.hermes/skills/autonomous-ai-agents/pickle-rick/scripts/council_publish.py <SESSION_ROOT>` to post review comments to every PR in the stack.
 
 Output: `[TASK_COMPLETED]`
 
@@ -91,8 +93,8 @@ Read `state.json` (iteration, min_iterations, working_dir), `council-stack.json`
 
 ### Step 11: Update State
 ```bash
-python3 ~/.hermes/skills/autonomous-ai-agents/pickle-rick/scripts/update-state.js" iteration <current+1> <SESSION_ROOT>
-python3 ~/.hermes/skills/autonomous-ai-agents/pickle-rick/scripts/update-state.js" step review <SESSION_ROOT>
+python3 ~/.hermes/skills/autonomous-ai-agents/pickle-rick/scripts/pickle_state.py update iteration <current+1> <SESSION_ROOT>
+python3 ~/.hermes/skills/autonomous-ai-agents/pickle-rick/scripts/pickle_state.py update step review <SESSION_ROOT>
 ```
 Read or create `<SESSION_ROOT>pickle-rick-council-summary.md`.
 
@@ -116,6 +118,8 @@ Read or create `<SESSION_ROOT>pickle-rick-council-summary.md`.
 
 Severity: **P0** = security/correctness must-fix, **P1** = architecture/quality should-fix, **P2** = style/polish nice-to-fix.
 
+Every issue must include a confidence score: `[P<N>, conf=<score>]` where score is 0–100. Drop findings with `conf < 80` unless they are P0 Critical with `conf ≥ 50` (surface with `[NEEDS-VERIFICATION]`). See `pickle-rick-szechuan-sauce/principles.md` for the full confidence rubric and false-positives filter.
+
 ### Step 15: Walk the Stack
 
 For each branch (trunk-to-tip):
@@ -123,7 +127,8 @@ For each branch (trunk-to-tip):
 2. `gt branch info --body --branch <branch> --no-interactive` — get PR description
 3. Cross-reference diff against `council-claude-rules.json`
 4. If GitNexus enabled (passes 2–3, 6–7): query graph for violations
-5. Review against focus area, track issues: branch + file:line + severity + description
+5. Review against focus area, track issues: branch + file:line + severity + **conf** + description
+6. **Pre-filter false positives** using the 9 noise classes from principles.md before scoring confidence
 
 Cross-branch passes (6–7): compare adjacent branch diffs for contract mismatches.
 
@@ -135,7 +140,8 @@ Structure the directive as an agent-executable prompt with these sections:
 - **Project Rules**: inline key rules from `council-claude-rules.json` so the fixing agent knows project conventions
 - **Stack Overview**: repo, trunk, branches, pass number, issue counts by severity
 - **Instructions**: for each branch, checkout with `gt branch checkout <branch> --no-interactive`, fix, stage only modified files, commit with `"address council pass <N>: <summary>"`
-- **Per-branch sections**: each issue ordered P0-first with: file:line, CLAUDE.md rule violated (or N/A), PR purpose (from PR body), problem description, fix instruction, before/after code snippet (3-5 relevant lines only)
+- **Per-branch sections**: each issue ordered P0-first with: file:line, CLAUDE.md rule violated (or N/A), PR purpose (from PR body), problem description, fix instruction, before/after code snippet (3-5 relevant lines only). **Every issue MUST use `[P<N>, conf=<score>]` format.**
+- **Dropped Candidates**: append-only `## Dropped Candidates (conf < 80)` section listing findings that were filtered out (severity, reason for drop, file:line). Caps at 50 entries (FIFO).
 - **Completion**: `gt restack --no-interactive`, then run lint/test/build commands from `council-claude-rules.json`. If restack has conflicts, resolve before continuing.
 
 Print directive path. "The Council has spoken. Feed this to your agent, Rick."
@@ -143,13 +149,19 @@ Append findings to summary (Step 17). Do NOT output `[THE_CITADEL_APPROVES]`.
 
 **No issues** → write clean directive, append clean-pass to summary. Output: `[THE_CITADEL_APPROVES]`
 
+**Clean-pass gate**: Every unconditional category (1, 2, 3, 4, 5, 6, 8, 9, 11) must have a clean-pass row in the summary before `[THE_CITADEL_APPROVES]` fires. Skipped categories don't count.
+
 ### Step 17: Findings Summary
 
-Append to `<SESSION_ROOT>pickle-rick-council-summary.md`:
+Append to `<SESSION_ROOT>/pickle-rick-council-summary.md`:
 
-Issues: `## Pass <N>: <CATEGORY> — <count> issues` + table (severity, branch, file, issue, rule, recommendation) + `Directive: council-directive.md updated`.
+Issues: `## Pass <N>: <CATEGORY> — <count> issues` + table (severity, **conf**, branch, file, issue, rule, recommendation) + `Directive: council-directive.md updated`.
 
 Clean: `## Pass <N>: <CATEGORY> — clean pass. The Citadel approves.`
+
+**Header contract**: Three legal suffixes: `— clean pass.`, `— skipped (<reason>).`, `— <count> issues (...)`. Anything else is `parse_error` and requires human attention.
+
+**Dropped Candidates audit trail** — mandatory `## Dropped Candidates` subsection at top of summary, append-only. Every dropped finding: pass number, severity, file:line, drop reason.
 
 ## Persona
 - Open: "The Council convenes!" Issues: "The Council has spoken." Clean: "adequate."

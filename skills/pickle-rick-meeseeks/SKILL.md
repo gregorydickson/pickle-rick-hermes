@@ -52,7 +52,7 @@ From user input: `--min-iterations <N>` overrides MIN_PASSES, `--max-iterations 
 
 ### Step 4: Initialize
 ```bash
-python3 ~/.hermes/skills/autonomous-ai-agents/pickle-rick/scripts/setup.js" --tmux --min-iterations <MIN_PASSES> --max-iterations <MAX_PASSES> --command-template meeseeks.md --task "Mr. Meeseeks Code Review: <task-text>"
+python3 ~/.hermes/skills/autonomous-ai-agents/pickle-rick/scripts/pickle_state.py init --tmux --min-iterations <MIN_PASSES> --max-iterations <MAX_PASSES> --command-template meeseeks.md --task "Mr. Meeseeks Code Review: <task-text>"
 ```
 Default task: `"Mr. Meeseeks Code Review"`. Extract `SESSION_ROOT=<path>` from output.
 
@@ -66,7 +66,7 @@ Print attach command immediately: `tmux attach -t <name>` (Window 1 "monitor" = 
 
 ### Step 6: Launch Runner
 ```bash
-tmux send-keys -t <name>:0 "python3 ~/.hermes/skills/autonomous-ai-agents/pickle-rick/scripts/mux-runner.js <SESSION_ROOT>; echo ''; echo 'Mr. Meeseeks has ceased to exist.'; read" Enter
+tmux send-keys -t <name>:0 "python3 ~/.hermes/skills/autonomous-ai-agents/pickle-rick/scripts/mux_runner.py <SESSION_ROOT>; echo ''; echo 'Mr. Meeseeks has ceased to exist.'; read" Enter
 ```
 
 ### Step 7: Monitor (3-pane)
@@ -75,7 +75,7 @@ bash ~/.hermes/skills/autonomous-ai-agents/pickle-rick/scripts/tmux-monitor.sh" 
 ```
 
 ### Step 8: Report
-Print: session name, `tmux attach -t <name>`, window layout (monitor: dashboard/log-stream/runner-log, runner: background), min/max passes, cancel: `cd <working_dir> && eat-pickle`, emergency: `tmux kill-session -t <name>` then `python3 ~/.hermes/skills/autonomous-ai-agents/pickle-rick/scripts/cancel.js`, state path: `<SESSION_ROOT>/state.json`.
+Print: session name, `tmux attach -t <name>`, window layout (monitor: dashboard/log-stream/runner-log, runner: background), min/max passes, cancel: `cd <working_dir> && eat-pickle`, emergency: `tmux kill-session -t <name>` then `python3 ~/.hermes/skills/autonomous-ai-agents/pickle-rick/scripts/pickle_utils.py cancel`, state path: `<SESSION_ROOT>/state.json`.
 
 ### Step 9: Exit
 Output: `[TASK_COMPLETED]`
@@ -89,8 +89,8 @@ Read `<SESSION_ROOT>/state.json`: `iteration`, `min_iterations`, `original_promp
 
 ### Step 11: Update State
 ```bash
-python3 ~/.hermes/skills/autonomous-ai-agents/pickle-rick/scripts/update-state.js" iteration <current+1> <SESSION_ROOT>
-python3 ~/.hermes/skills/autonomous-ai-agents/pickle-rick/scripts/update-state.js" step review <SESSION_ROOT>
+python3 ~/.hermes/skills/autonomous-ai-agents/pickle-rick/scripts/pickle_state.py update iteration <current+1> <SESSION_ROOT>
+python3 ~/.hermes/skills/autonomous-ai-agents/pickle-rick/scripts/pickle_state.py update step review <SESSION_ROOT>
 ```
 
 ### Step 11b: Findings Summary

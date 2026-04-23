@@ -55,6 +55,45 @@ Based on [Theta-Tech-AI/deslop](https://github.com/Theta-Tech-AI/llm-public-util
 | **P3: Low** | Polish | Magic numbers, naming, minor duplication | If time permits |
 | **P4: Optional** | Style | Formatting, comment cleanup, minor refactors | Boy Scout Rule |
 
+## Confidence Scoring
+
+Every finding must carry a confidence score (0–100) alongside its severity. The score reflects how certain you are that the issue is real and actionable.
+
+| Score | Meaning | When to Use |
+|-------|---------|-------------|
+| **0** | Wild guess | Never emit |
+| **25** | Suspicious pattern | Needs investigation before fix |
+| **50** | Likely issue | Probable but not certain |
+| **75** | Strong evidence | Verified by reading code or running tests |
+| **100** | Certain | Reproduced or obviously wrong |
+
+**Decision rule**: `conf < 80` → DROP the finding (do not emit). The only exception is **P0 Critical** findings with `conf ≥ 50`, which must surface with a `[NEEDS-VERIFICATION]` tag.
+
+**Severity composes independently with confidence**:
+- A P0 at conf=50 still surfaces (tagged `[NEEDS-VERIFICATION]`)
+- A P2 at conf=100 stays
+- A P1 at conf=25 gets dropped
+
+**Emission format**: `[P<N>, conf=<score>]` — e.g. `[P1, conf=75]`
+
+**Assignment guidance**: Verify before rating 75+. If you haven't read the relevant code, cap at 50. If you're inferring from patterns alone, cap at 25.
+
+## False Positives — Do NOT Flag
+
+The Council that cries wolf gets ignored. Do NOT flag these noise classes:
+
+1. **Pre-existing issues on unmodified lines** — Only flag problems in code changed or touched by the current PR/stack
+2. **Linter/typechecker/compiler-surfaceable errors** — If `eslint`, `tsc`, or the compiler would catch it, don't duplicate
+3. **Generic coverage hand-wringing** — "This file has no tests" without identifying a specific untested edge case
+4. **Intentional changes** — The author clearly meant to do it; don't flag design choices you disagree with
+5. **Author-silenced issues** — `eslint-disable-next-line` with a comment explaining why
+6. **Uncodified style nits** — Personal preference not in CLAUDE.md/AGENTS.md or project conventions
+7. **Speculative futures** — "This might break if X happens" — only flag concrete, reproducible issues
+8. **Already-resolved prior findings** — Don't re-flag issues from previous passes that were fixed
+9. **Tautological or vacuous observations** — "This function could be shorter" without specific actionable refactoring
+
+A dropped candidate (conf < 80) still contributes to learning. Append dropped findings to the audit trail for the session.
+
 ## Part I: Clean Code
 
 ### KISS (Keep It Simple, Stupid)

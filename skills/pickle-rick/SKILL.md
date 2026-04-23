@@ -8,7 +8,7 @@ metadata:
   hermes:
     tags: [autonomous, engineering, loop, orchestration, PRD, delegation]
     homepage: https://github.com/gregorydickson/pickle-rick-hermes
-    related_skills: [pickle-rick-meeseeks, hermes-agent, subagent-driven-development]
+    related_skills: [pickle-rick-anatomy-park, pickle-rick-meeseeks, pickle-rick-microverse, pickle-rick-portal-gun, pickle-rick-council, pickle-rick-jar, pickle-rick-morty, pickle-rick-morty-review, pickle-rick-chaos, pickle-rick-dot, pickle-rick-dot-patterns, pickle-rick-attract, pickle-rick-tmux, pickle-rick-zellij, pickle-rick-prd, pickle-rick-refine-prd, pickle-rick-retry, pickle-rick-standup, pickle-rick-szechuan-sauce, hermes-agent, subagent-driven-development]
 ---
 
 # Pickle Rick — Autonomous Engineering Loop for Hermes
@@ -246,20 +246,26 @@ Load the full persona from references/persona.md.
 
 ## Integration with Other Skills
 
+- **pickle-rick-anatomy-park**: Three-phase subsystem deep review — trace flows, fix without regression, catalog trap doors
 - **pickle-rick-prd**: Interactive PRD drafter with user interview
 - **pickle-rick-refine-prd**: 3 parallel analyst refinement + ticket decomposition
 - **pickle-rick-meeseeks**: Chain after implementation for iterative code review
+- **pickle-rick-meeseeks-zellij**: Meeseeks review loop in Zellij layout
 - **pickle-rick-microverse**: Use for metric-driven convergence optimization
 - **pickle-rick-portal-gun**: Transplant patterns from donor repos, generates PRDs
 - **pickle-rick-council**: Review stacked PRs with agent-executable directives
 - **pickle-rick-jar**: Queue multiple tasks for sequential batch execution
 - **pickle-rick-morty**: Worker lifecycle (loaded by delegate_task workers)
 - **pickle-rick-morty-review**: Cross-ticket spec conformance review worker
-- **pickle-rick-tmux**: Launch sessions in tmux/Zellij with live monitor dashboard
+- **pickle-rick-tmux**: Launch sessions in tmux with live monitor dashboard
+- **pickle-rick-zellij**: Launch sessions in Zellij with KDL layouts
 - **pickle-rick-chaos**: Project Mayhem chaos engineering (mutation/deps/config)
 - **pickle-rick-dot**: Convert PRDs to attractor-compatible DOT graphs
 - **pickle-rick-dot-patterns**: DOT convergence pattern reference
 - **pickle-rick-attract**: Submit DOT pipelines to attractor server
+- **pickle-rick-retry**: Retry failed or timed-out tickets
+- **pickle-rick-standup**: Activity log standup formatter
+- **pickle-rick-szechuan-sauce**: Principle-driven code quality convergence
 - **pickle-rick-help**: List all available commands and utilities
 
 ## Pitfalls

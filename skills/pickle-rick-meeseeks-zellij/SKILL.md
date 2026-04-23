@@ -61,8 +61,8 @@ If `$ZELLIJ` env var is set, warn: "Nested Zellij session detected — this may 
 
 Read min/max passes from `pickle_settings.json`:
 ```bash
-MIN_PASSES=$(node -e "const s=JSON.parse(require('fs').readFileSync('~/.pickle-rick/pickle_settings.json'));console.log(s.default_meeseeks_min_passes||10)")
-MAX_PASSES=$(node -e "const s=JSON.parse(require('fs').readFileSync('~/.pickle-rick/pickle_settings.json'));console.log(s.default_meeseeks_max_passes||50)")
+MIN_PASSES=$(python3 -c "import json; print(json.load(open('~/.pickle-rick/pickle_settings.json')).get('default_meeseeks_min_passes', 10))")
+MAX_PASSES=$(python3 -c "import json; print(json.load(open('~/.pickle-rick/pickle_settings.json')).get('default_meeseeks_max_passes', 50))")
 ```
 
 ## Step 3: Parse Flags
@@ -72,7 +72,7 @@ From user input: `--min-iterations <N>` overrides MIN_PASSES, `--max-iterations 
 ## Step 4: Session Setup
 
 ```bash
-python3 ~/.hermes/skills/autonomous-ai-agents/pickle-rick/scripts/setup.js" --tmux \
+python3 ~/.hermes/skills/autonomous-ai-agents/pickle-rick/scripts/pickle_state.py init --tmux \
   --min-iterations $MIN_PASSES --max-iterations $MAX_PASSES \
   --command-template meeseeks.md --task "Mr. Meeseeks Code Review: <task-text>"
 ```
@@ -126,7 +126,7 @@ The KDL layout (`monitor-meeseeks.kdl`) creates both tabs automatically:
 
 ## Step 6: Report
 
-Print: session name, `zellij attach meeseeks-<hash>`, tab layout (monitor: dashboard top-left / log-stream top-right / runner-log bottom; runner: switch tabs with Zellij keybinds), min passes: `<MIN_PASSES>`, max passes: `<MAX_PASSES>`, cancel: `cd <working_dir> && eat-pickle` (graceful), emergency: `zellij delete-session meeseeks-<hash>` then `python3 ~/.hermes/skills/autonomous-ai-agents/pickle-rick/scripts/cancel.js`, state path: `<SESSION_ROOT>/state.json`.
+Print: session name, `zellij attach meeseeks-<hash>`, tab layout (monitor: dashboard top-left / log-stream top-right / runner-log bottom; runner: switch tabs with Zellij keybinds), min passes: `<MIN_PASSES>`, max passes: `<MAX_PASSES>`, cancel: `cd <working_dir> && eat-pickle` (graceful), emergency: `zellij delete-session meeseeks-<hash>` then `python3 ~/.hermes/skills/autonomous-ai-agents/pickle-rick/scripts/pickle_utils.py cancel`, state path: `<SESSION_ROOT>/state.json`.
 
 "I'm Mr. Meeseeks, look at me! CAN DO!"
 

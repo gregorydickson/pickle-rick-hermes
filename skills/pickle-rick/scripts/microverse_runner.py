@@ -225,8 +225,7 @@ Signal [BLOCKED] if you cannot make progress.
 
 def main():
     parser = argparse.ArgumentParser(description='Microverse Convergence Runner')
-    parser.add_argument('--metric', help='Shell command for metric (stdout last line = score)')
-    parser.add_argument('--goal', help='Natural language goal for LLM judge')
+    parser.add_argument('--metric', required=True, help='Shell command for metric (stdout last line = score)')
     parser.add_argument('--task', '-t', help='Task description (what to optimize)')
     parser.add_argument('--working-dir', '-w', help='Working directory')
     parser.add_argument('--direction', default='higher', choices=['higher', 'lower'])
@@ -251,11 +250,8 @@ def main():
         if not args.task:
             print("ERROR: --task is required for new sessions")
             sys.exit(1)
-        if not args.metric and not args.goal:
-            print("ERROR: --metric or --goal is required")
-            sys.exit(1)
-        if args.metric and args.goal:
-            print("ERROR: --metric and --goal are mutually exclusive")
+        if not args.metric:
+            print("ERROR: --metric is required")
             sys.exit(1)
         
         # Init session via pickle_state.py
@@ -282,8 +278,8 @@ def main():
             print(f"ERROR: Failed to read state after init: {e}")
             sys.exit(1)
         
-        metric_type = 'command' if args.metric else 'llm'
-        validation = args.metric or args.goal
+        metric_type = 'command'
+        validation = args.metric
         
         mv_state = {
             'status': 'gap_analysis',
@@ -376,12 +372,9 @@ def main():
         
         post_sha = get_git_head(working_dir)
         
-        # Measure metric (only for command type)
-        if metric_type == 'command':
-            score = measure_metric(metric_cmd, working_dir,
-                                   mv_state['key_metric'].get('timeout_seconds', 60))
-        else:
-            score = 0  # LLM judge would go here
+        # Measure metric
+        score = measure_metric(metric_cmd, working_dir,
+                               mv_state['key_metric'].get('timeout_seconds', 60))
         
         # Get previous score
         history = mv_state['convergence']['history']

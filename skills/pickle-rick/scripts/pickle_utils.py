@@ -13,10 +13,13 @@ import argparse
 import datetime
 import json
 import os
+import re
 import subprocess
 import sys
 from pathlib import Path
 from collections import defaultdict
+
+import pickle_state
 
 SESSIONS_ROOT = Path.home() / '.pickle-rick' / 'sessions'
 
@@ -103,8 +106,7 @@ def cmd_cancel(args):
         if state.get('active'):
             if args.session and s.name != args.session:
                 continue
-            state['active'] = False
-            state_path.write_text(json.dumps(state, indent=2))
+            pickle_state.locked_update(state_path, {'active': False})
             print(f"Cancelled: {s.name}")
             cancelled += 1
     
@@ -120,9 +122,10 @@ def cmd_cancel(args):
 
 def cmd_standup(args):
     """Generate standup report from activity logs."""
-    since = datetime.datetime.now() - datetime.timedelta(days=args.days)
+    since = datetime.datetime.now(datetime.timezone.utc) - datetime.timedelta(days=args.days)
+    since = since.replace(tzinfo=None)
     if args.since:
-        since = datetime.datetime.fromisoformat(args.since)
+        since = datetime.datetime.fromisoformat(args.since).replace(tzinfo=datetime.timezone.utc).replace(tzinfo=None)
     
     events = []
     
@@ -140,7 +143,7 @@ def cmd_standup(args):
                     continue
                 try:
                     entry = json.loads(line)
-                    ts = datetime.datetime.fromisoformat(entry['ts'].replace('Z', '+00:00').replace('+00:00', ''))
+                    ts = datetime.datetime.fromisoformat(entry['ts'].replace('Z', '+00:00'))
                     if ts >= since:
                         events.append(entry)
                 except (json.JSONDecodeError, KeyError, ValueError):
@@ -264,23 +267,27 @@ def cmd_metrics(args):
             else:
                 # Estimate from activity log
                 log_path = s / 'activity.jsonl'
+                duration = state.get('max_time_minutes', 0) * 60
                 try:
                     lines = log_path.read_text().strip().split('\n')
                     for line in reversed(lines):
-                        entry = json.loads(line)
+                        if not line.strip():
+                            continue
+                        try:
+                            entry = json.loads(line)
+                        except json.JSONDecodeError:
+                            continue
                         if entry.get('event') == 'session_end':
                             duration = entry.get('duration_min', 0) * 60
                             break
-                    else:
-                        duration = state.get('max_time_minutes', 0) * 60
-                except (OSError, json.JSONDecodeError):
-                    duration = 0
+                except OSError:
+                    pass
             total_duration += duration
         
-        # Count tickets
+        # Count tickets (directories only)
         tickets_dir = s / 'tickets'
         if tickets_dir.exists():
-            total_tickets += len(list(tickets_dir.iterdir()))
+            total_tickets += len([d for d in tickets_dir.iterdir() if d.is_dir()])
     
     print(f"Pickle Rick Metrics — Last {args.days} days")
     print(f"{'=' * 60}")
@@ -318,16 +325,15 @@ def cmd_retry(args):
     
     # Reset ticket status to Todo
     content = ticket_file.read_text()
-    content = content.replace('status: Done', 'status: Todo')
-    content = content.replace('status: Skipped', 'status: Todo')
-    content = content.replace('status: Failed', 'status: Todo')
+    content = re.sub(r'^status:\s*(Done|Skipped|Failed)', 'status: Todo', content, flags=re.IGNORECASE | re.MULTILINE)
     ticket_file.write_text(content)
     
     # Update state to point to this ticket
-    state['current_ticket'] = args.ticket
-    state['step'] = 'research'
-    state['active'] = True
-    state_path.write_text(json.dumps(state, indent=2))
+    pickle_state.locked_update(state_path, {
+        'current_ticket': args.ticket,
+        'step': 'research',
+        'active': True,
+    })
     
     print(f"Ticket {args.ticket} reset to Todo")
     print(f"Session reactivated at step: research")

@@ -19,7 +19,7 @@ NEVER edit deployed files. Edit source, run `bash install.sh`.
 python3 -m pytest tests/ -v
 ```
 
-Tests: `tests/test_*.py` via pytest. 320 tests covering all 9 scripts + 16 skills.
+Tests: `tests/test_*.py` via pytest. 480+ tests covering all 15 scripts + 22 skills.
 
 ## Required Patterns
 
@@ -45,9 +45,11 @@ Before tagging: `python3 -m pytest tests/ -q` must pass clean.
 | circuit_breaker.py | 3-state circuit breaker (CLOSED/HALF_OPEN/OPEN), reads settings |
 | mux_runner.py | Context-clearing outer loop — spawns `hermes -q` per iteration |
 | microverse_runner.py | Metric convergence loop: measure, compare, rollback, stall |
+| init_microverse.py | Microverse session initialization |
 | pickle_jar.py | Batch queue runner (add/list/run/remove) |
 | pickle_utils.py | Status, cancel, standup, metrics, retry utilities |
 | monitor.py | Live terminal dashboard (Matrix-styled, 2s refresh) |
+| pipeline_runner.py | Pipeline execution with phase logging |
 | pattern_library.py | Persistent pattern cache for portal-gun (save/search/get) |
 | gitnexus_bridge.py | Code graph queries with grep fallback |
 | tmux-monitor.sh | 4-pane tmux layout launcher |
@@ -58,6 +60,7 @@ Before tagging: `python3 -m pytest tests/ -q` must pass clean.
 | pickle-rick-prd | Interactive PRD drafter with user interview |
 | pickle-rick-refine-prd | 3 parallel analysts refine PRD + decompose tickets |
 | pickle-rick-meeseeks | Iterative code review (10-50 passes, 7 categories) |
+| pickle-rick-meeseeks-zellij | Meeseeks in Zellij layout |
 | pickle-rick-microverse | Metric convergence optimization |
 | pickle-rick-portal-gun | Pattern transplantation + persistent library |
 | pickle-rick-council | PR stack review → agent-executable directives |
@@ -66,9 +69,14 @@ Before tagging: `python3 -m pytest tests/ -q` must pass clean.
 | pickle-rick-morty-review | Cross-ticket spec conformance review worker |
 | pickle-rick-chaos | Project Mayhem chaos engineering |
 | pickle-rick-dot | PRD to attractor DOT graph converter |
-| pickle-rick-dot-patterns | DOT convergence pattern reference (12 patterns) |
+| pickle-rick-dot-patterns | DOT convergence pattern reference |
 | pickle-rick-attract | Submit DOT to attractor server |
-| pickle-rick-tmux | tmux/Zellij launcher with monitor dashboard |
+| pickle-rick-anatomy-park | Subsystem deep review with trap-door catalog |
+| pickle-rick-szechuan-sauce | Principle-driven code quality convergence |
+| pickle-rick-retry | Retry failed tickets |
+| pickle-rick-standup | Standup summary from session activity |
+| pickle-rick-tmux | tmux launcher with monitor dashboard |
+| pickle-rick-zellij | Zellij launcher with KDL layouts |
 | pickle-rick-help | Command reference |
 
 ## Signal Protocol
